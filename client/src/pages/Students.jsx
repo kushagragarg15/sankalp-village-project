@@ -60,90 +60,133 @@ export default function Students() {
 
   return (
     <Layout>
-      <div className="max-w-7xl">
-        <div className="flex items-center justify-between mb-5">
-          <h1 className="text-[22px] font-semibold text-[#111111]">Students</h1>
+      <div className="w-full max-w-7xl mx-auto">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
+          <h1 className="text-xl sm:text-2xl font-semibold text-[#111111]">Students</h1>
           <button
             onClick={() => setShowModal(true)}
-            className="h-8 px-4 bg-[#111111] text-white text-[13px] font-medium rounded-md hover:bg-[#2a2a2a] transition-colors"
+            className="w-full sm:w-auto h-11 sm:h-9 px-4 bg-[#111111] text-white text-sm font-medium rounded-md hover:bg-[#2a2a2a] active:scale-[0.98] transition-all"
           >
-            Add Student
+            + Add Student
           </button>
         </div>
 
         {students.length === 0 ? (
-          <div className="bg-white border border-[#e4e4e4] rounded-lg p-12 text-center">
+          <div className="bg-white border border-[#e4e4e4] rounded-lg p-8 sm:p-12 text-center">
             <p className="text-[#6b6b6b] text-sm mb-4">No students yet</p>
             <button
               onClick={() => setShowModal(true)}
-              className="h-8 px-4 bg-[#111111] text-white text-[13px] font-medium rounded-md hover:bg-[#2a2a2a] transition-colors"
+              className="h-11 sm:h-9 px-4 bg-[#111111] text-white text-sm font-medium rounded-md hover:bg-[#2a2a2a] active:scale-[0.98] transition-all"
             >
               Add Student
             </button>
           </div>
         ) : (
-          <div className="bg-white border border-[#e4e4e4] rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full" style={{ minWidth: '700px' }}>
-                <thead>
-                  <tr className="bg-[#f7f7f6] border-b border-[#e4e4e4]">
-                    <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
-                      Name
-                    </th>
-                    <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
-                      Grade
-                    </th>
-                    <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
-                      Events Attended
-                    </th>
-                    <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
-                      Parent Phone
-                    </th>
-                    <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
-                      Enrollment Date
-                    </th>
-                    <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {students.map((student) => (
-                    <tr
-                      key={student._id}
-                      className="border-b border-[#f0f0f0] hover:bg-[#fafafa] transition-colors"
-                    >
-                      <td className="px-4 py-3 text-sm text-[#111111] font-medium">
-                        {student.name}
-                      </td>
-                      <td className="px-4 py-3">
+          <>
+            {/* Mobile Card View */}
+            <div className="block sm:hidden space-y-3">
+              {students.map((student) => (
+                <div
+                  key={student._id}
+                  className="bg-white border border-[#e4e4e4] rounded-lg p-4 hover:shadow-sm transition-shadow"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <h3 className="text-sm font-semibold text-[#111111] mb-2">{student.name}</h3>
+                      <div className="flex items-center gap-2 mb-2">
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#eff6ff] text-[#1d4ed8] border border-[#bfdbfe]">
                           {student.grade}
                         </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-[#111111]">
-                        {getEventsAttended(student)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-[#111111]">
-                        {student.parentPhone || <span className="text-[#9a9a9a]">Not provided</span>}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-[#111111]">
-                        {new Date(student.enrollmentDate).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => navigate(`/students/${student._id}`)}
-                          className="text-[13px] text-[#111111] hover:underline"
-                        >
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        <span className="text-xs text-[#6b6b6b]">
+                          {getEventsAttended(student)} events
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => navigate(`/students/${student._id}`)}
+                      className="h-9 px-3 bg-white border border-[#e4e4e4] text-[#111111] text-xs font-medium rounded-md hover:bg-[#fafafa] active:scale-[0.98] transition-all"
+                    >
+                      View
+                    </button>
+                  </div>
+                  <div className="text-xs text-[#6b6b6b] space-y-1">
+                    <p>
+                      <span className="text-[#9a9a9a]">Phone:</span>{' '}
+                      {student.parentPhone || <span className="text-[#9a9a9a]">Not provided</span>}
+                    </p>
+                    <p>
+                      <span className="text-[#9a9a9a]">Enrolled:</span>{' '}
+                      {new Date(student.enrollmentDate).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden sm:block bg-white border border-[#e4e4e4] rounded-lg overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full" style={{ minWidth: '700px' }}>
+                  <thead>
+                    <tr className="bg-[#f7f7f6] border-b border-[#e4e4e4]">
+                      <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
+                        Name
+                      </th>
+                      <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
+                        Grade
+                      </th>
+                      <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
+                        Events Attended
+                      </th>
+                      <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
+                        Parent Phone
+                      </th>
+                      <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
+                        Enrollment Date
+                      </th>
+                      <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {students.map((student) => (
+                      <tr
+                        key={student._id}
+                        className="border-b border-[#f0f0f0] hover:bg-[#fafafa] transition-colors"
+                      >
+                        <td className="px-4 py-3 text-sm text-[#111111] font-medium">
+                          {student.name}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#eff6ff] text-[#1d4ed8] border border-[#bfdbfe]">
+                            {student.grade}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-[#111111]">
+                          {getEventsAttended(student)}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-[#111111]">
+                          {student.parentPhone || <span className="text-[#9a9a9a]">Not provided</span>}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-[#111111]">
+                          {new Date(student.enrollmentDate).toLocaleDateString()}
+                        </td>
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => navigate(`/students/${student._id}`)}
+                            className="text-[13px] text-[#111111] hover:underline"
+                          >
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
         )}
 
         {/* Add Student Modal */}

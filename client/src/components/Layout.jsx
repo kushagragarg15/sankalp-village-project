@@ -47,6 +47,14 @@ export default function Layout({ children }) {
           .sidebar-overlay {
             display: none !important;
           }
+          .main-content-inner {
+            padding: 32px !important;
+          }
+        }
+        @media (min-width: 1280px) {
+          .main-content-inner {
+            padding: 40px !important;
+          }
         }
       `}</style>
 
