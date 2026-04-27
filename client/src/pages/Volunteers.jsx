@@ -85,55 +85,57 @@ export default function Volunteers() {
           </div>
         ) : (
           <div className="bg-white border border-[#e4e4e4] rounded-lg overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-[#f7f7f6] border-b border-[#e4e4e4]">
-                  <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
-                    Name
-                  </th>
-                  <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
-                    Email
-                  </th>
-                  <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
-                    Phone
-                  </th>
-                  <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
-                    Events Attended
-                  </th>
-                  <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {volunteers.map((volunteer) => (
-                  <tr
-                    key={volunteer._id}
-                    className="border-b border-[#f0f0f0] hover:bg-[#fafafa] transition-colors"
-                  >
-                    <td className="px-4 py-3 text-sm text-[#111111] font-medium">
-                      {volunteer.name}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-[#111111]">
-                      {volunteer.email}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-[#111111]">
-                      {volunteer.phone || (
-                        <span className="text-[#9a9a9a]">Not provided</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-[#111111]">
-                      {getAttendancePercentage(volunteer)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#f0faf2] text-[#3a7d44] border border-[#c6e8cc]">
-                        active
-                      </span>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full" style={{ minWidth: '600px' }}>
+                <thead>
+                  <tr className="bg-[#f7f7f6] border-b border-[#e4e4e4]">
+                    <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
+                      Name
+                    </th>
+                    <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
+                      Email
+                    </th>
+                    <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
+                      Phone
+                    </th>
+                    <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
+                      Events Attended
+                    </th>
+                    <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
+                      Status
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {volunteers.map((volunteer) => (
+                    <tr
+                      key={volunteer._id}
+                      className="border-b border-[#f0f0f0] hover:bg-[#fafafa] transition-colors"
+                    >
+                      <td className="px-4 py-3 text-sm text-[#111111] font-medium">
+                        {volunteer.name}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-[#111111]">
+                        {volunteer.email}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-[#111111]">
+                        {volunteer.phone || (
+                          <span className="text-[#9a9a9a]">Not provided</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-[#111111]">
+                        {getAttendancePercentage(volunteer)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#f0faf2] text-[#3a7d44] border border-[#c6e8cc]">
+                          active
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 

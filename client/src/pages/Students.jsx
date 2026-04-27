@@ -83,64 +83,66 @@ export default function Students() {
           </div>
         ) : (
           <div className="bg-white border border-[#e4e4e4] rounded-lg overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-[#f7f7f6] border-b border-[#e4e4e4]">
-                  <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
-                    Name
-                  </th>
-                  <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
-                    Grade
-                  </th>
-                  <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
-                    Events Attended
-                  </th>
-                  <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
-                    Parent Phone
-                  </th>
-                  <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
-                    Enrollment Date
-                  </th>
-                  <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {students.map((student) => (
-                  <tr
-                    key={student._id}
-                    className="border-b border-[#f0f0f0] hover:bg-[#fafafa] transition-colors"
-                  >
-                    <td className="px-4 py-3 text-sm text-[#111111] font-medium">
-                      {student.name}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#eff6ff] text-[#1d4ed8] border border-[#bfdbfe]">
-                        {student.grade}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-[#111111]">
-                      {getEventsAttended(student)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-[#111111]">
-                      {student.parentPhone || <span className="text-[#9a9a9a]">Not provided</span>}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-[#111111]">
-                      {new Date(student.enrollmentDate).toLocaleDateString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => navigate(`/students/${student._id}`)}
-                        className="text-[13px] text-[#111111] hover:underline"
-                      >
-                        View
-                      </button>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full" style={{ minWidth: '700px' }}>
+                <thead>
+                  <tr className="bg-[#f7f7f6] border-b border-[#e4e4e4]">
+                    <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
+                      Name
+                    </th>
+                    <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
+                      Grade
+                    </th>
+                    <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
+                      Events Attended
+                    </th>
+                    <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
+                      Parent Phone
+                    </th>
+                    <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
+                      Enrollment Date
+                    </th>
+                    <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
+                      Actions
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {students.map((student) => (
+                    <tr
+                      key={student._id}
+                      className="border-b border-[#f0f0f0] hover:bg-[#fafafa] transition-colors"
+                    >
+                      <td className="px-4 py-3 text-sm text-[#111111] font-medium">
+                        {student.name}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#eff6ff] text-[#1d4ed8] border border-[#bfdbfe]">
+                          {student.grade}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-[#111111]">
+                        {getEventsAttended(student)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-[#111111]">
+                        {student.parentPhone || <span className="text-[#9a9a9a]">Not provided</span>}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-[#111111]">
+                        {new Date(student.enrollmentDate).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => navigate(`/students/${student._id}`)}
+                          className="text-[13px] text-[#111111] hover:underline"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
