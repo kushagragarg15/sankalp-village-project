@@ -423,50 +423,6 @@ export default function Login() {
                 width="400"
               />
             </div>
-
-            <div style={{
-              marginTop: '32px',
-              paddingTop: '32px',
-              borderTop: '1px solid #eeeeee'
-            }}>
-              <p style={{
-                fontSize: '12px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em',
-                color: '#aaaaaa',
-                marginBottom: '16px'
-              }}>
-                demo access
-              </p>
-              
-              <div style={{ marginBottom: '12px' }}>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  fontSize: '13px',
-                  marginBottom: '4px'
-                }}>
-                  <span style={{ color: '#666666' }}>Admin</span>
-                  <span style={{ color: '#111111', fontFamily: 'monospace' }}>admin@sankalpvillage.org</span>
-                </div>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  fontSize: '13px'
-                }}>
-                  <span style={{ color: '#666666' }}>Volunteer</span>
-                  <span style={{ color: '#111111', fontFamily: 'monospace' }}>priya@sankalpvillage.org</span>
-                </div>
-              </div>
-              
-              <p style={{
-                fontSize: '12px',
-                color: '#aaaaaa',
-                marginTop: '12px'
-              }}>
-                Password for both: admin123 / volunteer123
-              </p>
-            </div>
           </div>
         </div>
       </div>
