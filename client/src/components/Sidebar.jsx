@@ -35,6 +35,15 @@ export default function Sidebar({ onNavigate }) {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
         
+        .mobile-close-btn:hover {
+          background-color: rgba(255, 255, 255, 0.1) !important;
+          border-radius: 4px;
+        }
+        
+        .mobile-close-btn:active {
+          background-color: rgba(255, 255, 255, 0.2) !important;
+        }
+        
         @media (min-width: 769px) {
           .mobile-close-btn {
             display: none !important;
@@ -94,26 +103,34 @@ export default function Sidebar({ onNavigate }) {
           </div>
           
           {/* Close button for mobile */}
-          {onNavigate && (
-            <button
-              onClick={onNavigate}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#ffffff',
-                cursor: 'pointer',
-                padding: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '24px',
-                lineHeight: '1'
-              }}
-              className="mobile-close-btn"
-            >
-              ×
-            </button>
-          )}
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (onNavigate) {
+                onNavigate();
+              }
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#ffffff',
+              cursor: 'pointer',
+              padding: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '28px',
+              lineHeight: '1',
+              minWidth: '40px',
+              minHeight: '40px',
+              WebkitTapHighlightColor: 'transparent'
+            }}
+            className="mobile-close-btn"
+            aria-label="Close menu"
+          >
+            ×
+          </button>
         </div>
 
         {/* Navigation */}
