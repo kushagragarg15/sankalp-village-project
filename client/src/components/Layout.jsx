@@ -8,8 +8,8 @@ export default function Layout({ children }) {
     <>
       <style>{`
         @media (max-width: 768px) {
-          .mobile-menu-button {
-            display: block !important;
+          .mobile-header {
+            display: flex !important;
           }
           .sidebar-container {
             transform: translateX(-100%);
@@ -30,13 +30,14 @@ export default function Layout({ children }) {
           }
           .main-content {
             margin-left: 0 !important;
+            padding-top: 60px !important;
           }
           .main-content-inner {
-            padding: 20px !important;
+            padding: 16px !important;
           }
         }
         @media (min-width: 769px) {
-          .mobile-menu-button {
+          .mobile-header {
             display: none !important;
           }
           .sidebar-overlay {
@@ -50,39 +51,58 @@ export default function Layout({ children }) {
         backgroundColor: '#f7f7f6',
         fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif'
       }}>
-        {/* Mobile Menu Button */}
-        <button
-          className="mobile-menu-button"
-          onClick={() => setSidebarOpen(!sidebarOpen)}
+        {/* Mobile Header */}
+        <div
+          className="mobile-header"
           style={{
+            display: 'none',
             position: 'fixed',
-            top: '16px',
-            left: '16px',
-            zIndex: 50,
-            width: '40px',
-            height: '40px',
-            backgroundColor: '#111111',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            display: 'none'
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '60px',
+            backgroundColor: '#ffffff',
+            borderBottom: '1px solid #e4e4e4',
+            alignItems: 'center',
+            padding: '0 16px',
+            zIndex: 30
           }}
         >
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 20 20"
-            fill="none"
-            style={{ margin: 'auto', display: 'block' }}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            style={{
+              width: '40px',
+              height: '40px',
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
           >
-            <path
-              d="M3 5h14M3 10h14M3 15h14"
-              stroke="white"
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#111111"
               strokeWidth="2"
               strokeLinecap="round"
-            />
-          </svg>
-        </button>
+            >
+              <path d="M3 6h18M3 12h18M3 18h18" />
+            </svg>
+          </button>
+          <span style={{
+            marginLeft: '12px',
+            fontSize: '16px',
+            fontWeight: '600',
+            color: '#111111'
+          }}>
+            Sankalp
+          </span>
+        </div>
 
         {/* Sidebar Overlay (Mobile) */}
         <div
