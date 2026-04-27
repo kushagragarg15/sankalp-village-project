@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { LayoutDashboard, CalendarDays, Users, GraduationCap, BarChart2, FileText } from 'lucide-react';
 import logoImage from '../assets/sankalp-logo.jpg';
 
-export default function Sidebar() {
+export default function Sidebar({ onNavigate }) {
   const location = useLocation();
   const { user, isAdmin, logout } = useAuth();
 
@@ -45,7 +45,8 @@ export default function Sidebar() {
         top: 0,
         display: 'flex',
         flexDirection: 'column',
-        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif'
+        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+        zIndex: 45
       }}>
         {/* Logo */}
         <div style={{ 
@@ -94,6 +95,7 @@ export default function Sidebar() {
               <Link
                 key={link.path}
                 to={link.path}
+                onClick={onNavigate}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
