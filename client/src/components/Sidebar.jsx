@@ -35,6 +35,11 @@ export default function Sidebar({ onNavigate }) {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
         
+        .mobile-close-btn {
+          -webkit-tap-highlight-color: transparent;
+          touch-action: manipulation;
+        }
+        
         .mobile-close-btn:hover {
           background-color: rgba(255, 255, 255, 0.1) !important;
           border-radius: 4px;
@@ -104,12 +109,7 @@ export default function Sidebar({ onNavigate }) {
           
           {/* Close button for mobile */}
           <button
-            onClick={() => {
-              console.log('Close button clicked!');
-              if (onNavigate) {
-                onNavigate();
-              }
-            }}
+            onClick={onNavigate}
             type="button"
             style={{
               background: 'none',
@@ -125,8 +125,7 @@ export default function Sidebar({ onNavigate }) {
               minWidth: '40px',
               minHeight: '40px',
               WebkitTapHighlightColor: 'transparent',
-              position: 'relative',
-              zIndex: 100
+              userSelect: 'none'
             }}
             className="mobile-close-btn"
             aria-label="Close menu"

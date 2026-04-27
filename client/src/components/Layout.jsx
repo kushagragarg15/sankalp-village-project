@@ -4,6 +4,10 @@ import Sidebar from './Sidebar';
 export default function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const handleCloseSidebar = () => {
+    setSidebarOpen(false);
+  };
+
   return (
     <>
       <style>{`
@@ -107,12 +111,12 @@ export default function Layout({ children }) {
         {/* Sidebar Overlay (Mobile) */}
         <div
           className={`sidebar-overlay ${sidebarOpen ? 'open' : ''}`}
-          onClick={() => setSidebarOpen(false)}
+          onClick={handleCloseSidebar}
         />
 
         {/* Sidebar */}
-        <div className={`sidebar-container ${sidebarOpen ? 'open' : ''}`} style={{ position: 'fixed', zIndex: 50 }}>
-          <Sidebar onNavigate={() => setSidebarOpen(false)} />
+        <div className={`sidebar-container ${sidebarOpen ? 'open' : ''}`} style={{ position: 'fixed', zIndex: 60 }}>
+          <Sidebar onNavigate={handleCloseSidebar} />
         </div>
 
         {/* Main Content */}
