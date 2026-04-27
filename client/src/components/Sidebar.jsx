@@ -104,13 +104,13 @@ export default function Sidebar({ onNavigate }) {
           
           {/* Close button for mobile */}
           <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
+            onClick={() => {
+              console.log('Close button clicked!');
               if (onNavigate) {
                 onNavigate();
               }
             }}
+            type="button"
             style={{
               background: 'none',
               border: 'none',
@@ -124,7 +124,9 @@ export default function Sidebar({ onNavigate }) {
               lineHeight: '1',
               minWidth: '40px',
               minHeight: '40px',
-              WebkitTapHighlightColor: 'transparent'
+              WebkitTapHighlightColor: 'transparent',
+              position: 'relative',
+              zIndex: 100
             }}
             className="mobile-close-btn"
             aria-label="Close menu"
