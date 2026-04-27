@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import logoImage from '../assets/sankalp-logo.jpg';
+import studentIllustration from '../assets/student-illustration.png';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -230,6 +231,26 @@ export default function Login() {
               <p style={{ marginBottom: '8px' }}>23 volunteer sessions this month</p>
               <p>Active since January 2024</p>
             </div>
+          </div>
+          
+          {/* Student Illustration */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            margin: '40px 0'
+          }}>
+            <img 
+              src={studentIllustration}
+              alt="Student Learning"
+              style={{
+                maxWidth: '280px',
+                width: '100%',
+                height: 'auto',
+                opacity: 0.85,
+                filter: 'brightness(0.95)'
+              }}
+            />
           </div>
           
           <p style={{
