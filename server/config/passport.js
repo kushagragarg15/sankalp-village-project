@@ -21,19 +21,40 @@ passport.use(
         // Check if user exists with same email
         user = await User.findOne({ email: profile.emails[0].value });
 
+        // Determine role based on email pattern
+        const email = profile.emails[0].value;
+        let role = 'volunteer'; // Default role
+        
+        // Check if email starts with 23 or 24 (admin access)
+        if (email.startsWith('23') || email.startsWith('24')) {
+          role = 'admin';
+        }
+        // Check if email starts with 25 or 26 (volunteer access)
+        else if (email.startsWith('25') || email.startsWith('26')) {
+          role = 'volunteer';
+        }
+
         if (user) {
-          // Link Google account to existing user
+          // Link Google account to existing user and update role
           user.googleId = profile.id;
+          
+          // Update role based on email pattern if it matches the criteria
+          if (email.startsWith('23') || email.startsWith('24')) {
+            user.role = 'admin';
+          } else if (email.startsWith('25') || email.startsWith('26')) {
+            user.role = 'volunteer';
+          }
+          
           await user.save();
           return done(null, user);
         }
 
-        // Create new user
+        // Create new user with role based on email pattern
         user = await User.create({
           googleId: profile.id,
           name: profile.displayName,
           email: profile.emails[0].value,
-          role: 'volunteer', // Default role, can be changed by admin
+          role: role,
         });
 
         done(null, user);

@@ -124,6 +124,12 @@ When deploying to production:
 4. Select your Google account
 5. You should be redirected to the dashboard!
 
+**Note on Automatic Role Assignment:**
+- Users with emails starting with `23` or `24` will automatically get **admin** access
+- Users with emails starting with `25` or `26` will automatically get **volunteer** access
+- All other users will get **volunteer** access by default
+- This is useful for educational institutions where batch years are part of email addresses
+
 ## Troubleshooting
 
 ### "redirect_uri_mismatch" Error
@@ -143,9 +149,12 @@ When deploying to production:
 
 ### User Created but Can't Access Features
 
-- By default, new Google sign-in users are created with the "volunteer" role
-- An admin needs to change their role if they need admin access
-- This can be done through the database or by adding an admin promotion feature
+- New Google sign-in users are automatically assigned roles based on their email:
+  - **Admin role**: Emails starting with `23` or `24` (e.g., `23bcs001@example.com`, `24mca123@example.com`)
+  - **Volunteer role**: Emails starting with `25` or `26` (e.g., `25btech@example.com`, `26mtech@example.com`)
+  - **Default volunteer role**: All other emails
+- Existing users who link their Google account will have their role updated based on the email pattern
+- This automatic role assignment happens during the Google sign-in process
 
 ## Security Notes
 

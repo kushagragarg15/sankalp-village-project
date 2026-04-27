@@ -130,20 +130,41 @@ exports.googleAuth = async (req, res, next) => {
       });
     }
 
+    // Determine role based on email pattern
+    const email = decoded.email;
+    let role = 'volunteer'; // Default role
+    
+    // Check if email starts with 23 or 24 (admin access)
+    if (email.startsWith('23') || email.startsWith('24')) {
+      role = 'admin';
+    }
+    // Check if email starts with 25 or 26 (volunteer access)
+    else if (email.startsWith('25') || email.startsWith('26')) {
+      role = 'volunteer';
+    }
+
     // Check if user exists
     let user = await User.findOne({ email: decoded.email });
 
     if (!user) {
-      // Create new user
+      // Create new user with role based on email pattern
       user = await User.create({
         googleId: decoded.sub,
         name: decoded.name,
         email: decoded.email,
-        role: 'volunteer', // Default role
+        role: role,
       });
     } else if (!user.googleId) {
-      // Link Google account to existing user
+      // Link Google account to existing user and update role if needed
       user.googleId = decoded.sub;
+      
+      // Update role based on email pattern if it matches the criteria
+      if (email.startsWith('23') || email.startsWith('24')) {
+        user.role = 'admin';
+      } else if (email.startsWith('25') || email.startsWith('26')) {
+        user.role = 'volunteer';
+      }
+      
       await user.save();
     }
 
