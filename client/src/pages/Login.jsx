@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import logoImage from '../assets/sankalp-logo.jpg';
 
 export default function Login() {
@@ -42,8 +43,32 @@ export default function Login() {
     setLoading(false);
   };
 
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setError('');
+    setLoading(true);
+
+    try {
+      const result = await login(null, null, credentialResponse.credential);
+      
+      if (result.success) {
+        navigate('/dashboard');
+      } else {
+        setError(result.message || 'Google sign-in failed');
+      }
+    } catch (err) {
+      setError('Google sign-in failed. Please try again.');
+    }
+    
+    setLoading(false);
+  };
+
+  const handleGoogleError = () => {
+    setError('Google sign-in was cancelled or failed');
+  };
+
   return (
-    <>
+    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || ''}>
+      <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@600&display=swap');
         
@@ -362,6 +387,43 @@ export default function Login() {
               </button>
             </form>
 
+            {/* Divider */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              margin: '24px 0'
+            }}>
+              <div style={{ flex: 1, height: '1px', backgroundColor: '#eeeeee' }} />
+              <span style={{
+                padding: '0 16px',
+                fontSize: '12px',
+                color: '#aaaaaa',
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em'
+              }}>
+                or
+              </span>
+              <div style={{ flex: 1, height: '1px', backgroundColor: '#eeeeee' }} />
+            </div>
+
+            {/* Google Sign-In Button */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'center',
+              marginBottom: '32px'
+            }}>
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={handleGoogleError}
+                useOneTap
+                theme="outline"
+                size="large"
+                text="signin_with"
+                shape="rectangular"
+                width="400"
+              />
+            </div>
+
             <div style={{
               marginTop: '32px',
               paddingTop: '32px',
@@ -425,5 +487,6 @@ export default function Login() {
         }
       `}</style>
     </>
+    </GoogleOAuthProvider>
   );
 }

@@ -31,9 +31,17 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = async (email, password) => {
+  const login = async (email, password, googleCredential = null) => {
     try {
-      const response = await api.post('/auth/login', { email, password });
+      let response;
+      
+      if (googleCredential) {
+        // Google OAuth login
+        response = await api.post('/auth/google', { credential: googleCredential });
+      } else {
+        // Regular email/password login
+        response = await api.post('/auth/login', { email, password });
+      }
       
       // Store token in localStorage
       if (response.data.token) {

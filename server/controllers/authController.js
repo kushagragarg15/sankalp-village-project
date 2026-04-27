@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const passport = require('../config/passport');
 
 // Generate JWT token
 const generateToken = (id) => {
@@ -99,6 +100,74 @@ exports.getMe = async (req, res, next) => {
     res.status(200).json({
       success: true,
       data: user
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Google OAuth callback
+// @route   POST /api/auth/google
+// @access  Public
+exports.googleAuth = async (req, res, next) => {
+  try {
+    const { credential } = req.body;
+
+    if (!credential) {
+      return res.status(400).json({
+        success: false,
+        message: 'No credential provided'
+      });
+    }
+
+    // Decode the JWT token from Google
+    const decoded = jwt.decode(credential);
+
+    if (!decoded || !decoded.email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid credential'
+      });
+    }
+
+    // Check if user exists
+    let user = await User.findOne({ email: decoded.email });
+
+    if (!user) {
+      // Create new user
+      user = await User.create({
+        googleId: decoded.sub,
+        name: decoded.name,
+        email: decoded.email,
+        role: 'volunteer', // Default role
+      });
+    } else if (!user.googleId) {
+      // Link Google account to existing user
+      user.googleId = decoded.sub;
+      await user.save();
+    }
+
+    // Create token
+    const token = generateToken(user._id);
+
+    // Set cookie with token
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+    });
+
+    res.status(200).json({
+      success: true,
+      token: token,
+      data: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        phone: user.phone
+      }
     });
   } catch (error) {
     next(error);
