@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "clear-data": "node scripts/clearData.js"
+    "clear-data": "node scripts/clearData.js",
+    "update-user-role": "node scripts/updateUserRole.js",
+    "update-all-roles": "node scripts/updateAllUserRoles.js"
   },
   "keywords": [
     "education",
