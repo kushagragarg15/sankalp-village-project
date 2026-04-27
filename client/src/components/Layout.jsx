@@ -111,7 +111,7 @@ export default function Layout({ children }) {
         />
 
         {/* Sidebar */}
-        <div className={`sidebar-container ${sidebarOpen ? 'open' : ''}`}>
+        <div className={`sidebar-container ${sidebarOpen ? 'open' : ''}`} style={{ position: 'fixed', zIndex: 50 }}>
           <Sidebar onNavigate={() => setSidebarOpen(false)} />
         </div>
 

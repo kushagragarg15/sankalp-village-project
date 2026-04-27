@@ -46,7 +46,7 @@ export default function Sidebar({ onNavigate }) {
         display: 'flex',
         flexDirection: 'column',
         fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
-        zIndex: 45
+        zIndex: 50
       }}>
         {/* Logo */}
         <div style={{ 
