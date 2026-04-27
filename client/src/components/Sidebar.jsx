@@ -60,13 +60,9 @@ export default function Sidebar({ onNavigate }) {
         width: '220px',
         backgroundColor: '#111111',
         height: '100vh',
-        position: 'fixed',
-        left: 0,
-        top: 0,
         display: 'flex',
         flexDirection: 'column',
-        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
-        zIndex: 50
+        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif'
       }}>
         {/* Logo */}
         <div style={{ 

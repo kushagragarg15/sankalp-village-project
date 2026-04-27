@@ -115,7 +115,17 @@ export default function Layout({ children }) {
         />
 
         {/* Sidebar */}
-        <div className={`sidebar-container ${sidebarOpen ? 'open' : ''}`} style={{ position: 'fixed', zIndex: 60 }}>
+        <div 
+          className={`sidebar-container ${sidebarOpen ? 'open' : ''}`} 
+          style={{ 
+            position: 'fixed',
+            left: 0,
+            top: 0,
+            width: '220px',
+            height: '100vh',
+            zIndex: 60
+          }}
+        >
           <Sidebar onNavigate={handleCloseSidebar} />
         </div>
 
