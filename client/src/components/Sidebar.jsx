@@ -34,6 +34,12 @@ export default function Sidebar({ onNavigate }) {
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+        
+        @media (min-width: 769px) {
+          .mobile-close-btn {
+            display: none !important;
+          }
+        }
       `}</style>
       
       <div style={{
@@ -52,37 +58,62 @@ export default function Sidebar({ onNavigate }) {
         <div style={{ 
           display: 'flex',
           alignItems: 'center',
+          justifyContent: 'space-between',
           gap: '10px',
           padding: '20px 16px 16px 16px',
           borderBottom: '1px solid #1f1f1f'
         }}>
-          <img 
-            src={logoImage}
-            alt="Sankalp Logo"
-            style={{
-              height: '28px',
-              width: 'auto',
-              objectFit: 'contain'
-            }}
-          />
-          <div>
-            <h1 style={{ 
-              fontSize: '15px', 
-              fontWeight: '600', 
-              color: '#ffffff',
-              marginBottom: '2px',
-              lineHeight: '1'
-            }}>
-              Sankalp
-            </h1>
-            <p style={{ 
-              fontSize: '11px', 
-              color: '#666666',
-              lineHeight: '1'
-            }}>
-              Rural Education
-            </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <img 
+              src={logoImage}
+              alt="Sankalp Logo"
+              style={{
+                height: '28px',
+                width: 'auto',
+                objectFit: 'contain'
+              }}
+            />
+            <div>
+              <h1 style={{ 
+                fontSize: '15px', 
+                fontWeight: '600', 
+                color: '#ffffff',
+                marginBottom: '2px',
+                lineHeight: '1'
+              }}>
+                Sankalp
+              </h1>
+              <p style={{ 
+                fontSize: '11px', 
+                color: '#666666',
+                lineHeight: '1'
+              }}>
+                Rural Education
+              </p>
+            </div>
           </div>
+          
+          {/* Close button for mobile */}
+          {onNavigate && (
+            <button
+              onClick={onNavigate}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#ffffff',
+                cursor: 'pointer',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '24px',
+                lineHeight: '1'
+              }}
+              className="mobile-close-btn"
+            >
+              ×
+            </button>
+          )}
         </div>
 
         {/* Navigation */}
