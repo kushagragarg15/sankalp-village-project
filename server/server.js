@@ -39,6 +39,7 @@ app.use('/api/ai', require('./routes/ai'));
 app.use('/api/attendance-sessions', require('./routes/attendanceSessions'));
 app.use('/api/registrations', require('./routes/registrations'));
 app.use('/api/teaching-logs', require('./routes/teachingLogs'));
+app.use('/api/volunteer-attendance', require('./routes/volunteerAttendance'));
 
 // Error handler (must be last)
 app.use(errorHandler);

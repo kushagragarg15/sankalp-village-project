@@ -7,6 +7,7 @@ import StudentProgress from './pages/StudentProgress';
 import CheckIn from './pages/CheckIn';
 import LogSession from './pages/LogSession';
 import MyAttendance from './pages/MyAttendance';
+import MyAttendanceNew from './pages/MyAttendanceNew';
 import Volunteers from './pages/Volunteers';
 import Analytics from './pages/Analytics';
 import AITeachingNotes from './pages/AITeachingNotes';
@@ -76,6 +77,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <MyAttendance />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/my-attendance-new"
+            element={
+              <ProtectedRoute>
+                <MyAttendanceNew />
               </ProtectedRoute>
             }
           />

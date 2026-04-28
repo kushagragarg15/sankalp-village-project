@@ -65,4 +65,11 @@ export const teachingLogAPI = {
 // Students API (if not already exists)
 export const getStudents = () => api.get('/students');
 
+// Volunteer Attendance API
+export const volunteerAttendanceAPI = {
+  getAll: () => api.get('/volunteer-attendance'),
+  getMyAttendance: () => api.get('/volunteer-attendance/my-attendance'),
+  getVolunteerAttendance: (volunteerId) => api.get(`/volunteer-attendance/${volunteerId}`)
+};
+
 export default api;

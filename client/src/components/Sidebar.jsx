@@ -21,6 +21,7 @@ export default function Sidebar({ onNavigate }) {
   const volunteerLinks = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/volunteer-sessions', label: 'Attendance Sessions', icon: ClipboardCheck },
+    { path: '/my-attendance-new', label: 'My Attendance', icon: BarChart2 },
     { path: '/students', label: 'Students', icon: GraduationCap },
     { path: '/analytics', label: 'Analytics', icon: BarChart2 },
     { path: '/ai-notes', label: 'AI Notes', icon: FileText }
