@@ -4,6 +4,65 @@ import Modal from '../components/Modal';
 import Input from '../components/Input';
 import { attendanceSessionAPI } from '../utils/api';
 
+// Component to display active code with countdown
+function ActiveCodeDisplay({ session, onRefresh }) {
+  const [timeLeft, setTimeLeft] = useState(0);
+
+  useEffect(() => {
+    const calculateTimeLeft = () => {
+      if (!session.codeExpiry) return 0;
+      const diff = new Date(session.codeExpiry) - new Date();
+      return Math.max(0, Math.floor(diff / 1000));
+    };
+
+    setTimeLeft(calculateTimeLeft());
+
+    const interval = setInterval(() => {
+      const newTimeLeft = calculateTimeLeft();
+      setTimeLeft(newTimeLeft);
+      
+      if (newTimeLeft === 0) {
+        onRefresh();
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [session.codeExpiry, onRefresh]);
+
+  const minutes = Math.floor(timeLeft / 60);
+  const seconds = timeLeft % 60;
+  const isExpiringSoon = timeLeft < 120; // Less than 2 minutes
+
+  if (!session.activeCode || timeLeft === 0) {
+    return null;
+  }
+
+  return (
+    <div className={`rounded-lg p-4 border-2 ${
+      isExpiringSoon 
+        ? 'bg-[#fff7ed] border-[#fb923c]' 
+        : 'bg-[#f0fdf4] border-[#86efac]'
+    }`}>
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs text-[#6b6b6b] mb-1">Active Code</p>
+          <p className="text-3xl font-bold font-mono tracking-wider text-[#111111]">
+            {session.activeCode}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-[#6b6b6b] mb-1">Expires in</p>
+          <p className={`text-2xl font-bold font-mono ${
+            isExpiringSoon ? 'text-[#ea580c]' : 'text-[#16a34a]'
+          }`}>
+            {minutes}:{seconds.toString().padStart(2, '0')}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminSessions() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -61,8 +120,7 @@ export default function AdminSessions() {
   const handleGenerateCode = async (sessionId) => {
     setGeneratingCode(sessionId);
     try {
-      const response = await attendanceSessionAPI.generateCode(sessionId);
-      alert(`Code generated: ${response.data.data.code}\nExpires at: ${new Date(response.data.data.expiry).toLocaleTimeString()}`);
+      await attendanceSessionAPI.generateCode(sessionId);
       fetchSessions();
     } catch (error) {
       alert(error.response?.data?.message || 'Failed to generate code');
@@ -103,11 +161,6 @@ export default function AdminSessions() {
     });
   };
 
-  const isCodeActive = (session) => {
-    if (!session.activeCode || !session.codeExpiry) return false;
-    return new Date() < new Date(session.codeExpiry);
-  };
-
   if (loading) {
     return (
       <Layout>
@@ -145,15 +198,12 @@ export default function AdminSessions() {
           </div>
         ) : (
           <div className="space-y-3 sm:space-y-4">
-            {sessions.map((session) => {
-              const codeActive = isCodeActive(session);
-
-              return (
-                <div
-                  key={session._id}
-                  className="bg-white border border-[#e4e4e4] rounded-lg p-4 sm:p-5 hover:shadow-sm transition-shadow"
-                >
-                  <div className="flex flex-col gap-4">
+            {sessions.map((session) => (
+              <div
+                key={session._id}
+                className="bg-white border border-[#e4e4e4] rounded-lg p-4 sm:p-5 hover:shadow-sm transition-shadow"
+              >
+                <div className="flex flex-col gap-4">
                     <div className="flex-1">
                       <h3 className="text-sm sm:text-[15px] font-semibold text-[#111111] mb-3">
                         {session.title}
@@ -168,24 +218,7 @@ export default function AdminSessions() {
                         </p>
                       </div>
 
-                      {session.activeCode && (
-                        <div className={`inline-flex items-center px-3 py-2 rounded-md text-sm font-mono ${
-                          codeActive
-                            ? 'bg-[#f0faf2] text-[#3a7d44] border border-[#c6e8cc]'
-                            : 'bg-[#fef2f2] text-[#dc2626] border border-[#fecaca]'
-                        }`}>
-                          <span className="font-semibold mr-2">Code:</span>
-                          {session.activeCode}
-                          {codeActive && (
-                            <span className="ml-2 text-xs">
-                              (expires {new Date(session.codeExpiry).toLocaleTimeString()})
-                            </span>
-                          )}
-                          {!codeActive && (
-                            <span className="ml-2 text-xs">(expired)</span>
-                          )}
-                        </div>
-                      )}
+                      <ActiveCodeDisplay session={session} onRefresh={fetchSessions} />
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-2">
@@ -205,8 +238,7 @@ export default function AdminSessions() {
                     </div>
                   </div>
                 </div>
-              );
-            })}
+              ))}
           </div>
         )}
 

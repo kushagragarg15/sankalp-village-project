@@ -4,9 +4,6 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Students from './pages/Students';
 import StudentProgress from './pages/StudentProgress';
-import Events from './pages/Events';
-import CreateEvent from './pages/CreateEvent';
-import EventDetails from './pages/EventDetails';
 import CheckIn from './pages/CheckIn';
 import LogSession from './pages/LogSession';
 import MyAttendance from './pages/MyAttendance';
@@ -52,33 +49,6 @@ function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/events"
-            element={
-              <ProtectedRoute adminOnly>
-                <Events />
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/events/create"
-            element={
-              <ProtectedRoute adminOnly>
-                <CreateEvent />
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/events/:id"
-            element={
-              <ProtectedRoute>
-                <EventDetails />
               </ProtectedRoute>
             }
           />

@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LayoutDashboard, CalendarDays, Users, GraduationCap, BarChart2, FileText, ClipboardCheck } from 'lucide-react';
+import { LayoutDashboard, Users, GraduationCap, BarChart2, FileText, ClipboardCheck } from 'lucide-react';
 import logoImage from '../assets/sankalp-logo.jpg';
 
 export default function Sidebar({ onNavigate }) {
@@ -11,7 +11,6 @@ export default function Sidebar({ onNavigate }) {
 
   const adminLinks = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/events', label: 'Events', icon: CalendarDays },
     { path: '/admin-sessions', label: 'Manage Sessions', icon: ClipboardCheck },
     { path: '/volunteers', label: 'Volunteers', icon: Users },
     { path: '/students', label: 'Students', icon: GraduationCap },
@@ -22,9 +21,6 @@ export default function Sidebar({ onNavigate }) {
   const volunteerLinks = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/volunteer-sessions', label: 'Attendance Sessions', icon: ClipboardCheck },
-    { path: '/checkin', label: 'Check In', icon: CalendarDays },
-    { path: '/log-session', label: 'Log Session', icon: FileText },
-    { path: '/my-attendance', label: 'My Attendance', icon: BarChart2 },
     { path: '/students', label: 'Students', icon: GraduationCap },
     { path: '/analytics', label: 'Analytics', icon: BarChart2 },
     { path: '/ai-notes', label: 'AI Notes', icon: FileText }
