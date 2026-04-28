@@ -85,7 +85,37 @@ npm run change-role user@gmail.com volunteer
 
 ---
 
-### 4. Clear All Data
+### 4. Create Test Volunteers
+Create test volunteer accounts with passwords for easy testing.
+
+```bash
+npm run create-test-volunteers
+```
+
+**Creates 5 test accounts:**
+- volunteer1@gmail.com
+- volunteer2@gmail.com
+- volunteer3@gmail.com
+- john.volunteer@gmail.com
+- jane.volunteer@gmail.com
+
+**Password for all:** `volunteer123`
+
+**Output:**
+```
+✅ Created: Test Volunteer 1 (volunteer1@gmail.com)
+✅ Created: Test Volunteer 2 (volunteer2@gmail.com)
+...
+🔐 Login Credentials:
+   Email: volunteer1@gmail.com
+   Password: volunteer123 (for all accounts)
+```
+
+**Note:** If accounts already exist, they will be skipped.
+
+---
+
+### 5. Clear All Data
 ⚠️ **WARNING:** This deletes ALL data from the database!
 
 ```bash

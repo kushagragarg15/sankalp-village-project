@@ -10,6 +10,7 @@
     "list-users": "node scripts/listUsers.js",
     "manage-roles": "node scripts/manageUserRoles.js",
     "change-role": "node scripts/quickRoleChange.js",
+    "create-test-volunteers": "node scripts/createTestVolunteers.js",
     "update-user-role": "node scripts/updateUserRole.js",
     "update-all-roles": "node scripts/updateAllUserRoles.js"
   },
