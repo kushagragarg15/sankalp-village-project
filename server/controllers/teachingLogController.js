@@ -96,10 +96,10 @@ exports.submitTeachingLog = async (req, res, next) => {
       });
     }
 
-    // 5. Validate location (fixed school coordinates with 500m radius)
+    // 5. Validate location (fixed school coordinates with 1km radius for testing)
     const SCHOOL_LAT = 26.933531637176955;
     const SCHOOL_LNG = 75.9162266441557;
-    const ALLOWED_RADIUS = 500; // meters
+    const ALLOWED_RADIUS = 1000; // meters (1km for testing)
 
     if (lat && lng) {
       const distance = calculateDistance(

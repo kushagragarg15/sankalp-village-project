@@ -256,7 +256,7 @@ export default function AdminSessions() {
 
             <div className="bg-[#f7f7f6] border border-[#e4e4e4] rounded-lg p-4">
               <p className="text-xs text-[#6b6b6b]">
-                📍 Location validation is enabled (500m radius from school)
+                📍 Location validation is enabled (1km radius from school for testing)
               </p>
             </div>
 

@@ -296,7 +296,7 @@ export default function AttendancePage() {
                 ✓ Location captured: {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
               </p>
               <p className="text-xs text-[#6b6b6b] mt-1">
-                You must be within 500m of the school to submit
+                You must be within 1km of the school to submit (testing mode)
               </p>
             </div>
           ) : (
