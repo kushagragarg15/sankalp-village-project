@@ -115,7 +115,48 @@ npm run create-test-volunteers
 
 ---
 
-### 5. Clear All Data
+### 5. Create Test Students
+Create dummy student data for testing the attendance system.
+
+```bash
+npm run create-test-students
+```
+
+**Creates 26 test students:**
+- Grade 1: 3 students
+- Grade 2: 3 students
+- Grade 3: 4 students
+- Grade 4: 3 students
+- Grade 5: 4 students
+- Grade 6: 3 students
+- Grade 7: 3 students
+- Grade 8: 3 students
+
+**Output:**
+```
+✅ Created: Aarav Kumar (Grade 1)
+✅ Created: Diya Sharma (Grade 1)
+...
+📊 Summary:
+   Created: 26 students
+```
+
+**Note:** If students already exist, they will be skipped.
+
+---
+
+### 6. Create All Test Data
+Create both test volunteers and students in one command.
+
+```bash
+npm run create-test-data
+```
+
+This runs both `create-test-volunteers` and `create-test-students` sequentially.
+
+---
+
+### 7. Clear All Data
 ⚠️ **WARNING:** This deletes ALL data from the database!
 
 ```bash
