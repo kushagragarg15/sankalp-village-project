@@ -18,33 +18,23 @@ exports.getAllVolunteerAttendance = async (req, res, next) => {
           volunteerId: volunteer._id
         });
 
-        // Count total teaching logs
-        const totalLogs = await TeachingLog.countDocuments({
-          volunteerId: volunteer._id
-        });
-
-        // Get recent sessions
-        const recentLogs = await TeachingLog.find({
-          volunteerId: volunteer._id
-        })
-          .populate('sessionId', 'title startTime')
-          .sort({ timestamp: -1 })
-          .limit(5);
-
         return {
           _id: volunteer._id,
           name: volunteer.name,
           email: volunteer.email,
           phone: volunteer.phone,
-          sessionsAttended: sessionsAttended.length,
-          totalStudentsTaught: totalLogs,
-          recentSessions: recentLogs.map(log => ({
-            sessionTitle: log.sessionId?.title,
-            date: log.timestamp
-          }))
+          sessionsAttended: sessionsAttended.length
         };
       })
     );
+
+    // Sort by sessions attended (descending) - ranking
+    volunteerStats.sort((a, b) => b.sessionsAttended - a.sessionsAttended);
+
+    // Add rank
+    volunteerStats.forEach((volunteer, index) => {
+      volunteer.rank = index + 1;
+    });
 
     res.status(200).json({
       success: true,
@@ -103,11 +93,32 @@ exports.getMyAttendance = async (req, res, next) => {
 
     const attendanceHistory = Object.values(sessionGroups);
 
+    // Get my rank
+    const allVolunteers = await User.find({ role: 'volunteer' }).select('_id');
+    const volunteerStats = await Promise.all(
+      allVolunteers.map(async (volunteer) => {
+        const sessions = await TeachingLog.distinct('sessionId', {
+          volunteerId: volunteer._id
+        });
+        return {
+          volunteerId: volunteer._id.toString(),
+          sessionsAttended: sessions.length
+        };
+      })
+    );
+
+    // Sort by sessions attended
+    volunteerStats.sort((a, b) => b.sessionsAttended - a.sessionsAttended);
+
+    // Find my rank
+    const myRank = volunteerStats.findIndex(v => v.volunteerId === req.user.id.toString()) + 1;
+
     res.status(200).json({
       success: true,
       data: {
         totalSessions: sessionsAttended.length,
-        totalStudentsTaught: logs.length,
+        rank: myRank,
+        totalVolunteers: allVolunteers.length,
         attendanceHistory
       }
     });

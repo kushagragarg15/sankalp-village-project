@@ -50,18 +50,27 @@ export default function MyAttendanceNew() {
         </h1>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <div className="bg-white border border-[#e4e4e4] rounded-lg p-4 sm:p-6">
-            <p className="text-xs sm:text-sm text-[#6b6b6b] mb-1">Total Sessions Attended</p>
+            <p className="text-xs sm:text-sm text-[#6b6b6b] mb-1">My Rank</p>
+            <p className="text-2xl sm:text-3xl font-bold text-[#111111]">
+              #{attendance?.rank || '-'}
+            </p>
+            <p className="text-xs text-[#9a9a9a] mt-1">
+              out of {attendance?.totalVolunteers || 0} volunteers
+            </p>
+          </div>
+          <div className="bg-white border border-[#e4e4e4] rounded-lg p-4 sm:p-6">
+            <p className="text-xs sm:text-sm text-[#6b6b6b] mb-1">Sessions Attended</p>
             <p className="text-2xl sm:text-3xl font-bold text-[#111111]">
               {attendance?.totalSessions || 0}
             </p>
           </div>
           <div className="bg-white border border-[#e4e4e4] rounded-lg p-4 sm:p-6">
-            <p className="text-xs sm:text-sm text-[#6b6b6b] mb-1">Total Students Taught</p>
-            <p className="text-2xl sm:text-3xl font-bold text-[#111111]">
-              {attendance?.totalStudentsTaught || 0}
-            </p>
+            <p className="text-xs sm:text-sm text-[#6b6b6b] mb-1">Status</p>
+            <span className="inline-flex items-center px-3 py-1 rounded text-sm font-medium bg-[#f0faf2] text-[#3a7d44] border border-[#c6e8cc]">
+              Active
+            </span>
           </div>
         </div>
 

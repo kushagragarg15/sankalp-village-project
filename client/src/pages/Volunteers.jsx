@@ -53,12 +53,14 @@ export default function Volunteers() {
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
-                      <h3 className="text-sm font-semibold text-[#111111] mb-2">{volunteer.name}</h3>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[#111111] text-white text-sm font-bold">
+                          #{volunteer.rank}
+                        </span>
+                        <h3 className="text-sm font-semibold text-[#111111]">{volunteer.name}</h3>
+                      </div>
                       <div className="flex items-center gap-2 mb-2">
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#f0faf2] text-[#3a7d44] border border-[#c6e8cc]">
-                          active
-                        </span>
-                        <span className="text-xs text-[#6b6b6b]">
                           {volunteer.sessionsAttended} sessions
                         </span>
                       </div>
@@ -73,10 +75,6 @@ export default function Volunteers() {
                       <span className="text-[#9a9a9a]">Phone:</span>{' '}
                       {volunteer.phone || <span className="text-[#9a9a9a]">Not provided</span>}
                     </p>
-                    <p>
-                      <span className="text-[#9a9a9a]">Students Taught:</span>{' '}
-                      {volunteer.totalStudentsTaught}
-                    </p>
                   </div>
                 </div>
               ))}
@@ -89,6 +87,9 @@ export default function Volunteers() {
                   <thead>
                     <tr className="bg-[#f7f7f6] border-b border-[#e4e4e4]">
                       <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
+                        Rank
+                      </th>
+                      <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
                         Name
                       </th>
                       <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
@@ -100,12 +101,6 @@ export default function Volunteers() {
                       <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
                         Sessions Attended
                       </th>
-                      <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
-                        Students Taught
-                      </th>
-                      <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
-                        Status
-                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -114,6 +109,11 @@ export default function Volunteers() {
                         key={volunteer._id}
                         className="border-b border-[#f0f0f0] hover:bg-[#fafafa] transition-colors"
                       >
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[#111111] text-white text-sm font-bold">
+                            #{volunteer.rank}
+                          </span>
+                        </td>
                         <td className="px-4 py-3 text-sm text-[#111111] font-medium">
                           {volunteer.name}
                         </td>
@@ -125,16 +125,8 @@ export default function Volunteers() {
                             <span className="text-[#9a9a9a]">Not provided</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-sm text-[#111111]">
+                        <td className="px-4 py-3 text-sm text-[#111111] font-semibold">
                           {volunteer.sessionsAttended}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-[#111111]">
-                          {volunteer.totalStudentsTaught}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#f0faf2] text-[#3a7d44] border border-[#c6e8cc]">
-                            active
-                          </span>
                         </td>
                       </tr>
                     ))}
