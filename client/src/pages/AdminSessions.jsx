@@ -11,8 +11,7 @@ export default function AdminSessions() {
   const [generatingCode, setGeneratingCode] = useState(null);
   const [formData, setFormData] = useState({
     title: '',
-    startTime: '',
-    endTime: ''
+    date: ''
   });
 
   useEffect(() => {
@@ -34,15 +33,24 @@ export default function AdminSessions() {
     e.preventDefault();
 
     try {
+      // Create date objects for 4 PM to 7 PM on the selected date
+      const selectedDate = new Date(formData.date);
+      
+      const startTime = new Date(selectedDate);
+      startTime.setHours(16, 0, 0, 0); // 4:00 PM
+      
+      const endTime = new Date(selectedDate);
+      endTime.setHours(19, 0, 0, 0); // 7:00 PM
+
       const payload = {
         title: formData.title,
-        startTime: formData.startTime,
-        endTime: formData.endTime
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString()
       };
 
       await attendanceSessionAPI.create(payload);
       setShowModal(false);
-      setFormData({ title: '', startTime: '', endTime: '' });
+      setFormData({ title: '', date: '' });
       fetchSessions();
       alert('Session created successfully!');
     } catch (error) {
@@ -77,10 +85,21 @@ export default function AdminSessions() {
 
   const formatDateTime = (date) => {
     return new Date(date).toLocaleString('en-US', {
+      weekday: 'short',
       month: 'short',
       day: 'numeric',
+      year: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
+    });
+  };
+
+  const formatDate = (date) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric'
     });
   };
 
@@ -142,10 +161,10 @@ export default function AdminSessions() {
 
                       <div className="text-xs sm:text-[13px] text-[#6b6b6b] space-y-1 mb-3">
                         <p>
-                          <span className="font-medium">Start:</span> {formatDateTime(session.startTime)}
+                          <span className="font-medium">Date:</span> {formatDate(session.startTime)}
                         </p>
                         <p>
-                          <span className="font-medium">End:</span> {formatDateTime(session.endTime)}
+                          <span className="font-medium">Time:</span> 4:00 PM - 7:00 PM
                         </p>
                       </div>
 
@@ -206,21 +225,21 @@ export default function AdminSessions() {
               required
             />
 
-            <Input
-              label="Start Time"
-              type="datetime-local"
-              value={formData.startTime}
-              onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-              required
-            />
-
-            <Input
-              label="End Time"
-              type="datetime-local"
-              value={formData.endTime}
-              onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-              required
-            />
+            <div>
+              <label className="block text-sm font-medium text-[#111111] mb-2">
+                Session Date
+              </label>
+              <input
+                type="date"
+                value={formData.date}
+                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                className="w-full h-11 px-4 text-sm border border-[#e4e4e4] rounded-md focus:outline-none focus:border-[#111111]"
+                required
+              />
+              <p className="text-xs text-[#9a9a9a] mt-2">
+                Session will automatically run from 4:00 PM to 7:00 PM
+              </p>
+            </div>
 
             <div className="bg-[#f7f7f6] border border-[#e4e4e4] rounded-lg p-4">
               <p className="text-xs text-[#6b6b6b]">
