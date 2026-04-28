@@ -12,9 +12,7 @@ export default function AdminSessions() {
   const [formData, setFormData] = useState({
     title: '',
     startTime: '',
-    endTime: '',
-    lat: '',
-    lng: ''
+    endTime: ''
   });
 
   useEffect(() => {
@@ -42,17 +40,9 @@ export default function AdminSessions() {
         endTime: formData.endTime
       };
 
-      // Add location if provided
-      if (formData.lat && formData.lng) {
-        payload.location = {
-          lat: parseFloat(formData.lat),
-          lng: parseFloat(formData.lng)
-        };
-      }
-
       await attendanceSessionAPI.create(payload);
       setShowModal(false);
-      setFormData({ title: '', startTime: '', endTime: '', lat: '', lng: '' });
+      setFormData({ title: '', startTime: '', endTime: '' });
       fetchSessions();
       alert('Session created successfully!');
     } catch (error) {
@@ -157,11 +147,6 @@ export default function AdminSessions() {
                         <p>
                           <span className="font-medium">End:</span> {formatDateTime(session.endTime)}
                         </p>
-                        {session.location?.lat && session.location?.lng && (
-                          <p>
-                            <span className="font-medium">Location:</span> {session.location.lat.toFixed(4)}, {session.location.lng.toFixed(4)}
-                          </p>
-                        )}
                       </div>
 
                       {session.activeCode && (
@@ -237,30 +222,9 @@ export default function AdminSessions() {
               required
             />
 
-            <div className="border-t border-[#e4e4e4] pt-4">
-              <p className="text-sm font-medium text-[#111111] mb-3">
-                Location Validation (Optional)
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                <Input
-                  label="Latitude"
-                  type="number"
-                  step="any"
-                  value={formData.lat}
-                  onChange={(e) => setFormData({ ...formData, lat: e.target.value })}
-                  placeholder="e.g., 26.9124"
-                />
-                <Input
-                  label="Longitude"
-                  type="number"
-                  step="any"
-                  value={formData.lng}
-                  onChange={(e) => setFormData({ ...formData, lng: e.target.value })}
-                  placeholder="e.g., 75.7873"
-                />
-              </div>
-              <p className="text-xs text-[#9a9a9a] mt-2">
-                If provided, volunteers must be within 200m to submit attendance
+            <div className="bg-[#f7f7f6] border border-[#e4e4e4] rounded-lg p-4">
+              <p className="text-xs text-[#6b6b6b]">
+                📍 Location validation is enabled for all sessions (500m radius from school)
               </p>
             </div>
 

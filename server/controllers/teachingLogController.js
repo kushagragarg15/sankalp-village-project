@@ -96,26 +96,23 @@ exports.submitTeachingLog = async (req, res, next) => {
       });
     }
 
-    // 5. OPTIONAL: Validate location (if session has location set)
-    if (session.location && session.location.lat && session.location.lng) {
-      if (!lat || !lng) {
-        return res.status(400).json({
-          success: false,
-          message: 'Location is required for this session'
-        });
-      }
+    // 5. Validate location (fixed school coordinates with 500m radius)
+    const SCHOOL_LAT = 26.933531637176955;
+    const SCHOOL_LNG = 75.9162266441557;
+    const ALLOWED_RADIUS = 500; // meters
 
+    if (lat && lng) {
       const distance = calculateDistance(
-        session.location.lat,
-        session.location.lng,
+        SCHOOL_LAT,
+        SCHOOL_LNG,
         lat,
         lng
       );
 
-      if (distance > 200) {
+      if (distance > ALLOWED_RADIUS) {
         return res.status(400).json({
           success: false,
-          message: `You must be within 200 meters of the session location. Current distance: ${Math.round(distance)}m`
+          message: `You must be within ${ALLOWED_RADIUS} meters of the school location. Current distance: ${Math.round(distance)}m`
         });
       }
     }

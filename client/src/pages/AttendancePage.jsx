@@ -290,10 +290,19 @@ export default function AttendancePage() {
           </div>
 
           {/* Location Status */}
-          {location && (
+          {location ? (
             <div className="bg-[#f0faf2] border border-[#c6e8cc] rounded-lg p-4 mb-6">
               <p className="text-sm text-[#3a7d44]">
-                📍 Location captured: {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
+                ✓ Location captured: {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
+              </p>
+              <p className="text-xs text-[#6b6b6b] mt-1">
+                You must be within 500m of the school to submit
+              </p>
+            </div>
+          ) : (
+            <div className="bg-[#fff7ed] border border-[#fed7aa] rounded-lg p-4 mb-6">
+              <p className="text-sm text-[#c2410c]">
+                ⚠ Location not available - enable location services to submit attendance
               </p>
             </div>
           )}
@@ -309,7 +318,7 @@ export default function AttendancePage() {
             </button>
             <button
               type="submit"
-              disabled={submitting || Object.keys(selectedStudents).length === 0}
+              disabled={submitting || Object.keys(selectedStudents).length === 0 || !location}
               className="h-11 px-6 bg-[#111111] text-white text-sm font-medium rounded-md hover:bg-[#2a2a2a] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? 'Submitting...' : 'Submit Attendance'}

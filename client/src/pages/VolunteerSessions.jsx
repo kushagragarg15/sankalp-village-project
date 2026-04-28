@@ -118,11 +118,6 @@ export default function VolunteerSessions() {
                         <p>
                           <span className="font-medium">End:</span> {formatDateTime(session.endTime)}
                         </p>
-                        {session.location?.lat && session.location?.lng && (
-                          <p className="text-[#9a9a9a]">
-                            📍 Location validation enabled
-                          </p>
-                        )}
                       </div>
                     </div>
 
