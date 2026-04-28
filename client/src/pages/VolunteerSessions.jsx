@@ -61,15 +61,6 @@ export default function VolunteerSessions() {
     });
   };
 
-  const formatDate = (date) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric'
-    });
-  };
-
   if (loading) {
     return (
       <Layout>
@@ -122,10 +113,10 @@ export default function VolunteerSessions() {
 
                       <div className="text-xs sm:text-[13px] text-[#6b6b6b] space-y-1">
                         <p>
-                          <span className="font-medium">Date:</span> {formatDate(session.startTime)}
+                          <span className="font-medium">Start:</span> {formatDateTime(session.startTime)}
                         </p>
                         <p>
-                          <span className="font-medium">Time:</span> 4:00 PM - 7:00 PM
+                          <span className="font-medium">End:</span> {formatDateTime(session.endTime)}
                         </p>
                       </div>
                     </div>
