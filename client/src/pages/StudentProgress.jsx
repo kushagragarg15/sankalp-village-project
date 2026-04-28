@@ -101,7 +101,7 @@ export default function StudentProgress() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card>
             <CardBody>
-              <p className="text-sm text-zinc-500 mb-1">Events Attended</p>
+              <p className="text-sm text-zinc-500 mb-1">Sessions Attended</p>
               <p className="text-3xl font-semibold text-zinc-900">
                 {progress.attendance.eventsAttended || 0}
               </p>
