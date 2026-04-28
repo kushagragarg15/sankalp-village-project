@@ -12,6 +12,7 @@ export default function Sidebar({ onNavigate }) {
   const adminLinks = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/admin-sessions', label: 'Manage Sessions', icon: ClipboardCheck },
+    { path: '/attendance-report', label: 'Attendance Report', icon: FileText },
     { path: '/volunteers', label: 'Volunteers', icon: Users },
     { path: '/students', label: 'Students', icon: GraduationCap },
     { path: '/analytics', label: 'Analytics', icon: BarChart2 },

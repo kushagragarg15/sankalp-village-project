@@ -14,6 +14,7 @@ import AITeachingNotes from './pages/AITeachingNotes';
 import AdminSessions from './pages/AdminSessions';
 import VolunteerSessions from './pages/VolunteerSessions';
 import AttendancePage from './pages/AttendancePage';
+import AttendanceReport from './pages/AttendanceReport';
 
 // Protected route wrapper
 function ProtectedRoute({ children, adminOnly = false }) {
@@ -158,6 +159,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <AttendancePage />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/attendance-report"
+            element={
+              <ProtectedRoute adminOnly>
+                <AttendanceReport />
               </ProtectedRoute>
             }
           />

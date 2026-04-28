@@ -118,20 +118,32 @@ export default function AdminSessions() {
       const startTime = new Date();
       const endTime = new Date(startTime.getTime() + 3 * 60 * 60 * 1000); // 3 hours later
 
+      // Auto-generate title from date if not provided
+      const title = formData.title.trim() || generateSessionTitle(startTime);
+
       const payload = {
-        title: formData.title,
+        title,
         startTime: startTime.toISOString(),
         endTime: endTime.toISOString()
       };
 
       await attendanceSessionAPI.create(payload);
       setShowModal(false);
-      setFormData({ title: '', date: '' });
+      setFormData({ title: '' });
       fetchSessions();
       alert('Session created successfully! Active now for 3 hours.');
     } catch (error) {
       alert(error.response?.data?.message || 'Failed to create session');
     }
+  };
+
+  // Generate session title from date (e.g., "28.04.26.Saturday")
+  const generateSessionTitle = (date) => {
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = String(date.getFullYear()).slice(-2);
+    const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+    return `${day}.${month}.${year}.${dayName}`;
   };
 
   const handleDelete = async (sessionId) => {
@@ -238,12 +250,20 @@ export default function AdminSessions() {
         >
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
-              label="Session Title"
+              label="Session Title (Optional)"
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              placeholder="e.g., Weekend Learning Session"
-              required
+              placeholder="Leave empty to auto-generate from date"
             />
+
+            <div className="bg-[#f0fdf4] border border-[#86efac] rounded-lg p-4">
+              <p className="text-xs text-[#16a34a] font-medium mb-1">
+                ℹ️ Auto-Generated Title
+              </p>
+              <p className="text-xs text-[#6b6b6b]">
+                If left empty, session title will be auto-generated as: <strong>{generateSessionTitle(new Date())}</strong>
+              </p>
+            </div>
 
             <div className="bg-[#fff7ed] border border-[#fed7aa] rounded-lg p-4">
               <p className="text-xs text-[#c2410c] font-medium mb-1">
