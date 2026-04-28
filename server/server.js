@@ -35,6 +35,11 @@ app.use('/api/syllabus', require('./routes/syllabus'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/ai', require('./routes/ai'));
 
+// New attendance system routes
+app.use('/api/attendance-sessions', require('./routes/attendanceSessions'));
+app.use('/api/registrations', require('./routes/registrations'));
+app.use('/api/teaching-logs', require('./routes/teachingLogs'));
+
 // Error handler (must be last)
 app.use(errorHandler);
 

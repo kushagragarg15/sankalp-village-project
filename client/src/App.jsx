@@ -13,6 +13,9 @@ import MyAttendance from './pages/MyAttendance';
 import Volunteers from './pages/Volunteers';
 import Analytics from './pages/Analytics';
 import AITeachingNotes from './pages/AITeachingNotes';
+import AdminSessions from './pages/AdminSessions';
+import VolunteerSessions from './pages/VolunteerSessions';
+import AttendancePage from './pages/AttendancePage';
 
 // Protected route wrapper
 function ProtectedRoute({ children, adminOnly = false }) {
@@ -148,6 +151,33 @@ function App() {
             element={
               <ProtectedRoute>
                 <AITeachingNotes />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/admin-sessions"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminSessions />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/volunteer-sessions"
+            element={
+              <ProtectedRoute>
+                <VolunteerSessions />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/attendance/:sessionId"
+            element={
+              <ProtectedRoute>
+                <AttendancePage />
               </ProtectedRoute>
             }
           />
