@@ -33,8 +33,28 @@ function ActiveCodeDisplay({ session, onRefresh }) {
   const seconds = timeLeft % 60;
   const isExpiringSoon = timeLeft < 120; // Less than 2 minutes
 
+  // Check if session is currently active
+  const now = new Date();
+  const isSessionActive = now >= new Date(session.startTime) && now <= new Date(session.endTime);
+
+  if (!isSessionActive) {
+    return (
+      <div className="rounded-lg p-4 border-2 bg-[#fafafa] border-[#e4e4e4]">
+        <p className="text-sm text-[#6b6b6b] text-center">
+          Code will appear automatically when session starts
+        </p>
+      </div>
+    );
+  }
+
   if (!session.activeCode || timeLeft === 0) {
-    return null;
+    return (
+      <div className="rounded-lg p-4 border-2 bg-[#fff7ed] border-[#fb923c]">
+        <p className="text-sm text-[#ea580c] text-center">
+          Generating new code...
+        </p>
+      </div>
+    );
   }
 
   return (
@@ -67,7 +87,6 @@ export default function AdminSessions() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [generatingCode, setGeneratingCode] = useState(null);
   const [formData, setFormData] = useState({
     title: '',
     date: ''
@@ -75,6 +94,10 @@ export default function AdminSessions() {
 
   useEffect(() => {
     fetchSessions();
+    
+    // Auto-refresh every 30 seconds to get new codes
+    const interval = setInterval(fetchSessions, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchSessions = async () => {
@@ -114,18 +137,6 @@ export default function AdminSessions() {
       alert('Session created successfully!');
     } catch (error) {
       alert(error.response?.data?.message || 'Failed to create session');
-    }
-  };
-
-  const handleGenerateCode = async (sessionId) => {
-    setGeneratingCode(sessionId);
-    try {
-      await attendanceSessionAPI.generateCode(sessionId);
-      fetchSessions();
-    } catch (error) {
-      alert(error.response?.data?.message || 'Failed to generate code');
-    } finally {
-      setGeneratingCode(null);
     }
   };
 
@@ -221,14 +232,7 @@ export default function AdminSessions() {
                       <ActiveCodeDisplay session={session} onRefresh={fetchSessions} />
                     </div>
 
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <button
-                        onClick={() => handleGenerateCode(session._id)}
-                        disabled={generatingCode === session._id}
-                        className="h-11 sm:h-9 px-4 bg-[#3a7d44] text-white text-sm font-medium rounded-md hover:bg-[#2d6335] active:scale-[0.98] transition-all disabled:opacity-50"
-                      >
-                        {generatingCode === session._id ? 'Generating...' : 'Generate Code'}
-                      </button>
+                    <div className="flex justify-end">
                       <button
                         onClick={() => handleDelete(session._id)}
                         className="h-11 sm:h-9 px-4 bg-white border border-[#e4e4e4] text-[#dc2626] text-sm font-medium rounded-md hover:bg-[#fef2f2] transition-colors"

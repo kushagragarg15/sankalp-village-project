@@ -93,6 +93,24 @@ exports.getAllSessions = async (req, res, next) => {
       .populate('createdBy', 'name email')
       .sort({ startTime: -1 });
 
+    const now = new Date();
+
+    // Auto-generate codes for active sessions that don't have a valid code
+    for (const session of sessions) {
+      const isActive = now >= session.startTime && now <= session.endTime;
+      const hasValidCode = session.activeCode && session.codeExpiry && now < session.codeExpiry;
+
+      if (isActive && !hasValidCode) {
+        // Generate new code
+        const code = generateRandomCode();
+        const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
+
+        session.activeCode = code;
+        session.codeExpiry = expiry;
+        await session.save();
+      }
+    }
+
     res.status(200).json({
       success: true,
       count: sessions.length,
