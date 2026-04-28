@@ -44,10 +44,6 @@ export default function Students() {
     }
   };
 
-  const getEventsAttended = (student) => {
-    return student.attendance?.length || 0;
-  };
-
   if (loading) {
     return (
       <Layout>
@@ -97,9 +93,6 @@ export default function Students() {
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#eff6ff] text-[#1d4ed8] border border-[#bfdbfe]">
                           {student.grade}
                         </span>
-                        <span className="text-xs text-[#6b6b6b]">
-                          {getEventsAttended(student)} events
-                        </span>
                       </div>
                     </div>
                     <button
@@ -136,9 +129,6 @@ export default function Students() {
                         Grade
                       </th>
                       <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
-                        Events Attended
-                      </th>
-                      <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
                         Parent Phone
                       </th>
                       <th className="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[#9a9a9a] font-medium">
@@ -162,9 +152,6 @@ export default function Students() {
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#eff6ff] text-[#1d4ed8] border border-[#bfdbfe]">
                             {student.grade}
                           </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-[#111111]">
-                          {getEventsAttended(student)}
                         </td>
                         <td className="px-4 py-3 text-sm text-[#111111]">
                           {student.parentPhone || <span className="text-[#9a9a9a]">Not provided</span>}
