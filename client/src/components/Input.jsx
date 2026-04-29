@@ -7,7 +7,7 @@ export default function Input({ label, error, className = '', ...props }) {
         </label>
       )}
       <input
-        className={`w-full px-3 py-2 border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-150 ${
+        className={`w-full px-3 py-2 text-base border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-150 ${
           error ? 'border-red-500' : ''
         } ${className}`}
         {...props}
@@ -28,7 +28,7 @@ export function Select({ label, error, children, className = '', ...props }) {
         </label>
       )}
       <select
-        className={`w-full px-3 py-2 border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-150 ${
+        className={`w-full px-3 py-2 text-base border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-150 ${
           error ? 'border-red-500' : ''
         } ${className}`}
         {...props}
@@ -51,7 +51,7 @@ export function Textarea({ label, error, className = '', ...props }) {
         </label>
       )}
       <textarea
-        className={`w-full px-3 py-2 border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-150 ${
+        className={`w-full px-3 py-2 text-base border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-150 ${
           error ? 'border-red-500' : ''
         } ${className}`}
         {...props}
