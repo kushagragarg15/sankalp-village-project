@@ -5,12 +5,32 @@ import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import logoImage from '../assets/sankalp-logo.jpg';
 import studentIllustration from '../assets/student-illustration.png';
 
+const QUOTES = [
+  {
+    text: "Education is the most powerful weapon which you can use to change the world.",
+    author: "Nelson Mandela"
+  },
+  {
+    text: "The function of education is to teach one to think intensively and to think critically.",
+    author: "Martin Luther King Jr."
+  },
+  {
+    text: "Education is not preparation for life; education is life itself.",
+    author: "John Dewey"
+  },
+  {
+    text: "The roots of education are bitter, but the fruit is sweet.",
+    author: "Aristotle"
+  }
+];
+
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showContent, setShowContent] = useState(false);
+  const [currentQuoteIndex, setCurrentQuoteIndex] = useState(0);
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -20,6 +40,14 @@ export default function Login() {
       setShowContent(true);
     }, 1900);
     return () => clearTimeout(timer);
+  }, []);
+
+  // Rotate quotes every 6 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentQuoteIndex((prev) => (prev + 1) % QUOTES.length);
+    }, 6000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleSubmit = async (e) => {
@@ -112,6 +140,17 @@ export default function Login() {
           }
         }
         
+        @keyframes quoteFade {
+          0%, 100% {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          10%, 90% {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
         .logo-animated {
           animation: 
             logoReveal 800ms cubic-bezier(0.16, 1, 0.3, 1) 0ms forwards,
@@ -124,6 +163,10 @@ export default function Login() {
           opacity: 0;
         }
         
+        .quote-animated {
+          animation: quoteFade 6s ease-in-out infinite;
+        }
+        
         @media (prefers-reduced-motion: reduce) {
           .logo-animated {
             animation: none;
@@ -133,6 +176,11 @@ export default function Login() {
           .content-fade-in {
             animation: none;
             opacity: 1;
+          }
+          .quote-animated {
+            animation: none;
+            opacity: 1;
+            transform: translateY(0);
           }
         }
       `}</style>
@@ -166,8 +214,10 @@ export default function Login() {
       )}
       
       <div style={{ 
-        minHeight: '100vh', 
+        minHeight: '100vh',
+        height: '100vh',
         display: 'flex',
+        overflow: 'hidden',
         fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
         opacity: showContent ? 1 : 0,
         transition: 'opacity 300ms ease-out'
@@ -176,11 +226,12 @@ export default function Login() {
         <div style={{
           flex: '1',
           backgroundColor: '#1a1714',
-          padding: '60px',
+          padding: '48px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          color: '#ffffff'
+          color: '#ffffff',
+          overflow: 'hidden'
         }}
         className="hidden md:flex"
         >
@@ -190,27 +241,27 @@ export default function Login() {
               src={logoImage}
               alt="Sankalp Logo"
               style={{
-                height: '80px',
-                width: '80px',
+                height: '64px',
+                width: '64px',
                 objectFit: 'cover',
                 borderRadius: '50%',
-                marginBottom: '24px'
+                marginBottom: '20px'
               }}
             />
             
             <h1 style={{
               fontFamily: 'Playfair Display, Georgia, serif',
-              fontSize: '48px',
+              fontSize: '42px',
               fontWeight: '600',
-              marginBottom: '12px',
+              marginBottom: '8px',
               letterSpacing: '-0.02em'
             }}>
               Sankalp
             </h1>
             <p style={{
-              fontSize: '15px',
+              fontSize: '14px',
               color: '#a8a29e',
-              marginBottom: '32px'
+              marginBottom: '28px'
             }}>
               Rural Education Management System
             </p>
@@ -219,43 +270,36 @@ export default function Login() {
               width: '60px',
               height: '1px',
               backgroundColor: '#44403c',
-              marginBottom: '40px'
+              marginBottom: '32px'
             }} />
             
-            {/* Inspirational Quote */}
-            <div style={{
-              fontSize: '20px',
-              lineHeight: '1.7',
-              color: '#e7e5e4',
-              fontStyle: 'italic',
-              marginBottom: '16px',
-              fontFamily: 'Playfair Display, Georgia, serif'
-            }}>
-              "Education is the most powerful weapon which you can use to change the world."
-            </div>
-            <div style={{
-              fontSize: '14px',
-              color: '#78716c',
-              marginBottom: '32px'
-            }}>
-              — Nelson Mandela
-            </div>
-            
-            <div style={{
-              fontSize: '18px',
-              lineHeight: '1.7',
-              color: '#e7e5e4',
-              fontStyle: 'italic',
-              marginBottom: '16px',
-              fontFamily: 'Playfair Display, Georgia, serif'
-            }}>
-              "The function of education is to teach one to think intensively and to think critically."
-            </div>
-            <div style={{
-              fontSize: '14px',
-              color: '#78716c'
-            }}>
-              — Martin Luther King Jr.
+            {/* Rotating Quote */}
+            <div style={{ minHeight: '140px', position: 'relative' }}>
+              <div 
+                key={currentQuoteIndex}
+                className="quote-animated"
+                style={{
+                  position: 'absolute',
+                  width: '100%'
+                }}
+              >
+                <div style={{
+                  fontSize: '18px',
+                  lineHeight: '1.6',
+                  color: '#e7e5e4',
+                  fontStyle: 'italic',
+                  marginBottom: '12px',
+                  fontFamily: 'Playfair Display, Georgia, serif'
+                }}>
+                  "{QUOTES[currentQuoteIndex].text}"
+                </div>
+                <div style={{
+                  fontSize: '13px',
+                  color: '#78716c'
+                }}>
+                  — {QUOTES[currentQuoteIndex].author}
+                </div>
+              </div>
             </div>
           </div>
           
@@ -264,13 +308,13 @@ export default function Login() {
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
-            margin: '40px 0'
+            margin: '20px 0'
           }}>
             <img 
               src={studentIllustration}
               alt="Student Learning"
               style={{
-                maxWidth: '280px',
+                maxWidth: '240px',
                 width: '100%',
                 height: 'auto',
                 opacity: 0.85,
@@ -280,9 +324,9 @@ export default function Login() {
           </div>
           
           <p style={{
-            fontSize: '15px',
+            fontSize: '13px',
             color: '#57534e',
-            lineHeight: '1.6',
+            lineHeight: '1.5',
             fontStyle: 'italic'
           }}>
             Empowering rural communities through structured, volunteer-driven education
@@ -293,10 +337,11 @@ export default function Login() {
         <div style={{
           flex: '1',
           backgroundColor: '#ffffff',
-          padding: '60px',
+          padding: '48px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center'
+          justifyContent: 'center',
+          overflow: 'auto'
         }}>
           <div style={{ width: '100%', maxWidth: '400px' }}>
             {/* Mobile-only heading */}
