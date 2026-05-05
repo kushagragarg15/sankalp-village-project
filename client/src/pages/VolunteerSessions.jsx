@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { attendanceSessionAPI, registrationAPI } from '../utils/api';
+import { attendanceSessionAPI, registrationAPI, teachingLogAPI } from '../utils/api';
 
 export default function VolunteerSessions() {
   const navigate = useNavigate();
