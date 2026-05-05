@@ -22,11 +22,7 @@ export default function VolunteerSessions() {
       const [sessionsRes, registrationsRes, logsRes] = await Promise.all([
         attendanceSessionAPI.getAll(),
         registrationAPI.getMyRegistrations(),
-        fetch('/api/teaching-logs/my-logs', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        }).then(res => res.json())
+        teachingLogAPI.getMyLogs()
       ]);
 
       console.log('Sessions response:', sessionsRes);
@@ -34,7 +30,7 @@ export default function VolunteerSessions() {
       
       setSessions(sessionsRes.data.data || []);
       setMyRegistrations(registrationsRes.data.data || []);
-      setMyLogs(logsRes.data || []);
+      setMyLogs(logsRes.data.data || []);
     } catch (error) {
       console.error('Error fetching data:', error);
       console.error('Error details:', error.response?.data);

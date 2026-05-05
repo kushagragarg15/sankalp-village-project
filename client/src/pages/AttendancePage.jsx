@@ -28,18 +28,14 @@ export default function AttendancePage() {
       const [sessionRes, studentsRes, logsRes] = await Promise.all([
         attendanceSessionAPI.getOne(sessionId),
         getStudents(),
-        fetch('/api/teaching-logs/my-logs', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        }).then(res => res.json())
+        teachingLogAPI.getMyLogs()
       ]);
 
       setSession(sessionRes.data.data);
       setStudents(studentsRes.data.data);
       
       // Check if already submitted for this session
-      const hasSubmitted = logsRes.data?.some(
+      const hasSubmitted = logsRes.data.data?.some(
         log => log.sessionId?._id === sessionId || log.sessionId === sessionId
       );
       setAlreadySubmitted(hasSubmitted);
