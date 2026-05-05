@@ -25,20 +25,14 @@ export default function AttendancePage() {
 
   const fetchData = async () => {
     try {
-      const [sessionRes, studentsRes, logsRes] = await Promise.all([
+      const [sessionRes, studentsRes] = await Promise.all([
         attendanceSessionAPI.getOne(sessionId),
-        getStudents(),
-        teachingLogAPI.getMyLogs()
+        getStudents()
       ]);
 
       setSession(sessionRes.data.data);
       setStudents(studentsRes.data.data);
-      
-      // Check if already submitted for this session
-      const hasSubmitted = logsRes.data.data?.some(
-        log => log.sessionId?._id === sessionId || log.sessionId === sessionId
-      );
-      setAlreadySubmitted(hasSubmitted);
+      setAlreadySubmitted(false); // Disable duplicate check for now
     } catch (error) {
       setError('Failed to load data');
       console.error('Error fetching data:', error);

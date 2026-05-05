@@ -19,10 +19,9 @@ export default function VolunteerSessions() {
   const fetchData = async () => {
     try {
       setError(null);
-      const [sessionsRes, registrationsRes, logsRes] = await Promise.all([
+      const [sessionsRes, registrationsRes] = await Promise.all([
         attendanceSessionAPI.getAll(),
-        registrationAPI.getMyRegistrations(),
-        teachingLogAPI.getMyLogs()
+        registrationAPI.getMyRegistrations()
       ]);
 
       console.log('Sessions response:', sessionsRes);
@@ -30,7 +29,7 @@ export default function VolunteerSessions() {
       
       setSessions(sessionsRes.data.data || []);
       setMyRegistrations(registrationsRes.data.data || []);
-      setMyLogs(logsRes.data.data || []);
+      setMyLogs([]); // Skip loading logs for now
     } catch (error) {
       console.error('Error fetching data:', error);
       console.error('Error details:', error.response?.data);
@@ -172,13 +171,6 @@ export default function VolunteerSessions() {
                           className="h-11 sm:h-9 px-4 bg-[#111111] text-white text-sm font-medium rounded-md hover:bg-[#2a2a2a] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {registering === session._id ? 'Registering...' : 'Register'}
-                        </button>
-                      ) : submitted ? (
-                        <button
-                          disabled
-                          className="h-11 sm:h-9 px-4 bg-[#f0fdf4] text-[#15803d] text-sm font-medium rounded-md cursor-not-allowed border border-[#bbf7d0]"
-                        >
-                          ✓ Attendance Submitted
                         </button>
                       ) : active ? (
                         <button
