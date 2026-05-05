@@ -2,9 +2,9 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const Student = require('../models/Student');
 const Event = require('../models/Event');
-const Session = require('../models/Session');
-const Village = require('../models/Village');
-const Syllabus = require('../models/Syllabus');
+const AttendanceSession = require('../models/AttendanceSession');
+const Registration = require('../models/Registration');
+const TeachingLog = require('../models/TeachingLog');
 require('dotenv').config({ path: './.env' });
 
 const clearAllData = async () => {
@@ -22,14 +22,14 @@ const clearAllData = async () => {
     await Event.deleteMany({});
     console.log('✓ Cleared all events');
 
-    await Session.deleteMany({});
-    console.log('✓ Cleared all sessions');
+    await AttendanceSession.deleteMany({});
+    console.log('✓ Cleared all attendance sessions');
 
-    await Village.deleteMany({});
-    console.log('✓ Cleared all villages');
+    await Registration.deleteMany({});
+    console.log('✓ Cleared all registrations');
 
-    await Syllabus.deleteMany({});
-    console.log('✓ Cleared all syllabus data');
+    await TeachingLog.deleteMany({});
+    console.log('✓ Cleared all teaching logs');
 
     console.log('\n✅ All data cleared successfully!');
     console.log('Database is now empty and ready for production use.');

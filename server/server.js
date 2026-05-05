@@ -31,11 +31,10 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/students', require('./routes/students'));
 app.use('/api/events', require('./routes/events'));
-app.use('/api/syllabus', require('./routes/syllabus'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/ai', require('./routes/ai'));
 
-// New attendance system routes
+// Attendance system routes
 app.use('/api/attendance-sessions', require('./routes/attendanceSessions'));
 app.use('/api/registrations', require('./routes/registrations'));
 app.use('/api/teaching-logs', require('./routes/teachingLogs'));
