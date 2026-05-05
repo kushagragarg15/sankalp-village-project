@@ -9,6 +9,7 @@ export default function VolunteerSessions() {
   const [myRegistrations, setMyRegistrations] = useState([]);
   const [myLogs, setMyLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [registering, setRegistering] = useState(null);
 
   useEffect(() => {
@@ -17,6 +18,7 @@ export default function VolunteerSessions() {
 
   const fetchData = async () => {
     try {
+      setError(null);
       const [sessionsRes, registrationsRes, logsRes] = await Promise.all([
         attendanceSessionAPI.getAll(),
         registrationAPI.getMyRegistrations(),
@@ -27,11 +29,20 @@ export default function VolunteerSessions() {
         }).then(res => res.json())
       ]);
 
-      setSessions(sessionsRes.data.data);
-      setMyRegistrations(registrationsRes.data.data);
+      console.log('Sessions response:', sessionsRes);
+      console.log('Sessions data:', sessionsRes.data);
+      
+      setSessions(sessionsRes.data.data || []);
+      setMyRegistrations(registrationsRes.data.data || []);
       setMyLogs(logsRes.data || []);
     } catch (error) {
       console.error('Error fetching data:', error);
+      console.error('Error details:', error.response?.data);
+      setError(error.response?.data?.message || error.message || 'Failed to load sessions');
+      // Set empty arrays on error to show "no sessions" message
+      setSessions([]);
+      setMyRegistrations([]);
+      setMyLogs([]);
     } finally {
       setLoading(false);
     }
@@ -89,9 +100,28 @@ export default function VolunteerSessions() {
           Attendance Sessions
         </h1>
 
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <p className="text-sm text-red-600">
+              <strong>Error:</strong> {error}
+            </p>
+            <button
+              onClick={fetchData}
+              className="mt-2 text-sm text-red-700 underline hover:text-red-800"
+            >
+              Try again
+            </button>
+          </div>
+        )}
+
         {sessions.length === 0 ? (
           <div className="bg-white border border-[#e4e4e4] rounded-lg p-8 sm:p-12 text-center">
             <p className="text-[#6b6b6b] text-sm">No sessions available</p>
+            {!error && (
+              <p className="text-xs text-[#9a9a9a] mt-2">
+                Check back later or contact your administrator
+              </p>
+            )}
           </div>
         ) : (
           <div className="space-y-3 sm:space-y-4">
