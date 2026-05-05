@@ -16,6 +16,7 @@ export default function AttendancePage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [alreadySubmitted, setAlreadySubmitted] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -24,13 +25,24 @@ export default function AttendancePage() {
 
   const fetchData = async () => {
     try {
-      const [sessionRes, studentsRes] = await Promise.all([
+      const [sessionRes, studentsRes, logsRes] = await Promise.all([
         attendanceSessionAPI.getOne(sessionId),
-        getStudents()
+        getStudents(),
+        fetch('/api/teaching-logs/my-logs', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        }).then(res => res.json())
       ]);
 
       setSession(sessionRes.data.data);
       setStudents(studentsRes.data.data);
+      
+      // Check if already submitted for this session
+      const hasSubmitted = logsRes.data?.some(
+        log => log.sessionId?._id === sessionId || log.sessionId === sessionId
+      );
+      setAlreadySubmitted(hasSubmitted);
     } catch (error) {
       setError('Failed to load data');
       console.error('Error fetching data:', error);
@@ -148,6 +160,38 @@ export default function AttendancePage() {
       <Layout>
         <div className="text-center py-12">
           <p className="text-red-600">Session not found</p>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (alreadySubmitted) {
+    return (
+      <Layout>
+        <div className="w-full max-w-7xl mx-auto">
+          <div className="mb-6">
+            <button
+              onClick={() => navigate('/volunteer-sessions')}
+              className="text-sm text-[#6b6b6b] hover:text-[#111111] mb-4"
+            >
+              ← Back to Sessions
+            </button>
+          </div>
+          <div className="bg-[#f0fdf4] border border-[#bbf7d0] rounded-lg p-8 text-center">
+            <div className="text-5xl mb-4">✓</div>
+            <h2 className="text-xl font-semibold text-[#15803d] mb-2">
+              Attendance Already Submitted
+            </h2>
+            <p className="text-[#6b6b6b] mb-6">
+              You have already submitted attendance for this session.
+            </p>
+            <button
+              onClick={() => navigate('/volunteer-sessions')}
+              className="h-11 px-6 bg-[#15803d] text-white text-sm font-medium rounded-md hover:bg-[#166534] transition-colors"
+            >
+              Back to Sessions
+            </button>
+          </div>
         </div>
       </Layout>
     );

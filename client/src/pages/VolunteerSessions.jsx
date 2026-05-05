@@ -7,6 +7,7 @@ export default function VolunteerSessions() {
   const navigate = useNavigate();
   const [sessions, setSessions] = useState([]);
   const [myRegistrations, setMyRegistrations] = useState([]);
+  const [myLogs, setMyLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(null);
 
@@ -16,13 +17,19 @@ export default function VolunteerSessions() {
 
   const fetchData = async () => {
     try {
-      const [sessionsRes, registrationsRes] = await Promise.all([
+      const [sessionsRes, registrationsRes, logsRes] = await Promise.all([
         attendanceSessionAPI.getAll(),
-        registrationAPI.getMyRegistrations()
+        registrationAPI.getMyRegistrations(),
+        fetch('/api/teaching-logs/my-logs', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        }).then(res => res.json())
       ]);
 
       setSessions(sessionsRes.data.data);
       setMyRegistrations(registrationsRes.data.data);
+      setMyLogs(logsRes.data || []);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -45,6 +52,10 @@ export default function VolunteerSessions() {
 
   const isRegistered = (sessionId) => {
     return myRegistrations.some(reg => reg.sessionId?._id === sessionId);
+  };
+
+  const hasSubmittedAttendance = (sessionId) => {
+    return myLogs.some(log => log.sessionId?._id === sessionId || log.sessionId === sessionId);
   };
 
   const isSessionActive = (session) => {
@@ -87,6 +98,7 @@ export default function VolunteerSessions() {
             {sessions.map((session) => {
               const registered = isRegistered(session._id);
               const active = isSessionActive(session);
+              const submitted = hasSubmittedAttendance(session._id);
 
               return (
                 <div
@@ -109,6 +121,11 @@ export default function VolunteerSessions() {
                             Registered
                           </span>
                         )}
+                        {submitted && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#f0fdf4] text-[#15803d] border border-[#bbf7d0]">
+                            ✓ Submitted
+                          </span>
+                        )}
                       </div>
 
                       <div className="text-xs sm:text-[13px] text-[#6b6b6b] space-y-1">
@@ -129,6 +146,13 @@ export default function VolunteerSessions() {
                           className="h-11 sm:h-9 px-4 bg-[#111111] text-white text-sm font-medium rounded-md hover:bg-[#2a2a2a] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {registering === session._id ? 'Registering...' : 'Register'}
+                        </button>
+                      ) : submitted ? (
+                        <button
+                          disabled
+                          className="h-11 sm:h-9 px-4 bg-[#f0fdf4] text-[#15803d] text-sm font-medium rounded-md cursor-not-allowed border border-[#bbf7d0]"
+                        >
+                          ✓ Attendance Submitted
                         </button>
                       ) : active ? (
                         <button
