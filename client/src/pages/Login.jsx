@@ -219,17 +219,43 @@ export default function Login() {
               width: '60px',
               height: '1px',
               backgroundColor: '#44403c',
-              marginBottom: '32px'
+              marginBottom: '40px'
             }} />
             
+            {/* Inspirational Quote */}
             <div style={{
-              fontSize: '15px',
-              lineHeight: '1.8',
-              color: '#d6d3d1'
+              fontSize: '20px',
+              lineHeight: '1.7',
+              color: '#e7e5e4',
+              fontStyle: 'italic',
+              marginBottom: '16px',
+              fontFamily: 'Playfair Display, Georgia, serif'
             }}>
-              <p style={{ marginBottom: '8px' }}>47 students tracked across 6 villages</p>
-              <p style={{ marginBottom: '8px' }}>23 volunteer sessions this month</p>
-              <p>Active since January 2024</p>
+              "Education is the most powerful weapon which you can use to change the world."
+            </div>
+            <div style={{
+              fontSize: '14px',
+              color: '#78716c',
+              marginBottom: '32px'
+            }}>
+              — Nelson Mandela
+            </div>
+            
+            <div style={{
+              fontSize: '18px',
+              lineHeight: '1.7',
+              color: '#e7e5e4',
+              fontStyle: 'italic',
+              marginBottom: '16px',
+              fontFamily: 'Playfair Display, Georgia, serif'
+            }}>
+              "The function of education is to teach one to think intensively and to think critically."
+            </div>
+            <div style={{
+              fontSize: '14px',
+              color: '#78716c'
+            }}>
+              — Martin Luther King Jr.
             </div>
           </div>
           
@@ -254,11 +280,12 @@ export default function Login() {
           </div>
           
           <p style={{
-            fontSize: '13px',
+            fontSize: '15px',
             color: '#57534e',
-            lineHeight: '1.5'
+            lineHeight: '1.6',
+            fontStyle: 'italic'
           }}>
-            Built to bring structure to volunteer-driven learning
+            Empowering rural communities through structured, volunteer-driven education
           </p>
         </div>
 
