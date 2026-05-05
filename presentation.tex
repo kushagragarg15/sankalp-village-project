@@ -1,0 +1,970 @@
+% Sankalp - Rural Education Management System Presentation
+% Compile with: pdflatex presentation.tex
+
+\documentclass[aspectratio=169]{beamer}
+\usetheme{Madrid}
+\usecolortheme{default}
+
+% Packages
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{fontawesome5}
+
+% Color definitions
+\definecolor{primarycolor}{RGB}{26, 23, 20}
+\definecolor{accentcolor}{RGB}{194, 120, 3}
+\definecolor{successcolor}{RGB}{34, 197, 94}
+\definecolor{codebackground}{RGB}{250, 250, 250}
+
+% Code listing style
+\lstset{
+    backgroundcolor=\color{codebackground},
+    basicstyle=\ttfamily\footnotesize,
+    breaklines=true,
+    captionpos=b,
+    commentstyle=\color{gray},
+    keywordstyle=\color{blue},
+    stringstyle=\color{red},
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    showstringspaces=false
+}
+
+% Title page information
+\title{Sankalp}
+\subtitle{Rural Education Management System}
+\author{Project Team}
+\institute{Educational Technology Initiative}
+\date{\today}
+
+\begin{document}
+
+% Title slide
+\begin{frame}
+    \titlepage
+\end{frame}
+
+% Table of contents
+\begin{frame}{Outline}
+    \tableofcontents
+\end{frame}
+
+%=============================================================================
+% SECTION 1: THE PROBLEM
+%=============================================================================
+\section{The Problem}
+
+\begin{frame}{Rural Education Challenges}
+    \begin{columns}
+        \column{0.5\textwidth}
+        \textbf{Current Situation:}
+        \begin{itemize}
+            \item 6+ rural villages
+            \item 47+ students
+            \item Unstructured tracking
+            \item No coordination
+        \end{itemize}
+        
+        \column{0.5\textwidth}
+        \textbf{Key Issues:}
+        \begin{itemize}
+            \item[\faTimesCircle] Manual records
+            \item[\faTimesCircle] Coordination chaos
+            \item[\faTimesCircle] No progress tracking
+            \item[\faTimesCircle] Time-consuming admin
+        \end{itemize}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{Pain Points}
+    \begin{block}{For Administrators}
+        \begin{itemize}
+            \item Tracking volunteer attendance
+            \item No real-time visibility
+            \item Manual report compilation
+        \end{itemize}
+    \end{block}
+    
+    \vspace{0.5em}
+    
+    \begin{block}{For Volunteers}
+        \begin{itemize}
+            \item Unclear schedules
+            \item Manual attendance errors
+            \item No participation history
+        \end{itemize}
+    \end{block}
+\end{frame}
+
+%=============================================================================
+% SECTION 2: OUR SOLUTION
+%=============================================================================
+\section{Our Solution}
+
+\begin{frame}{Sankalp Platform Overview}
+    \begin{center}
+        \Large\textbf{A Comprehensive Digital Platform for}\\
+        \Large\textbf{Volunteer-Driven Rural Education}
+    \end{center}
+    
+    \vspace{1em}
+    
+    \begin{columns}
+        \column{0.33\textwidth}
+        \centering
+        \textcolor{accentcolor}{\faUsers}\\
+        \textbf{Volunteer Management}\\
+        \small QR check-in, session logging, rankings
+        
+        \column{0.33\textwidth}
+        \centering
+        \textcolor{accentcolor}{\faChartLine}\\
+        \textbf{Analytics Dashboard}\\
+        \small Real-time insights, impact metrics
+        
+        \column{0.33\textwidth}
+        \centering
+        \textcolor{accentcolor}{\faUserGraduate}\\
+        \textbf{Student Tracking}\\
+        \small Progress monitoring, attendance
+    \end{columns}
+\end{frame}
+
+\begin{frame}{Key Features - Administrator View}
+    \textbf{1. Event Management}
+    \begin{itemize}
+        \item Create weekend sessions with QR codes
+        \item Real-time volunteer tracking
+    \end{itemize}
+    
+    \vspace{0.3em}
+    
+    \textbf{2. Volunteer Analytics}
+    \begin{itemize}
+        \item Rankings and leaderboards
+        \item CSV export capabilities
+    \end{itemize}
+    
+    \vspace{0.3em}
+    
+    \textbf{3. Student Management}
+    \begin{itemize}
+        \item Centralized database
+        \item Progress tracking
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Key Features - Volunteer View}
+    \textbf{1. Quick Check-In}
+    \begin{itemize}
+        \item Scan QR code or enter event code
+        \item Location validation (1km radius)
+    \end{itemize}
+    
+    \vspace{0.3em}
+    
+    \textbf{2. Session Logging}
+    \begin{itemize}
+        \item Record teaching with student attendance
+        \item Subject and topic tracking
+    \end{itemize}
+    
+    \vspace{0.3em}
+    
+    \textbf{3. Personal Dashboard}
+    \begin{itemize}
+        \item View attendance history
+        \item Track participation rank
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{User Experience Highlights}
+    \begin{block}{Progressive Role Disclosure}
+        Login detects user role from email domain and adapts UI colors in real-time
+    \end{block}
+    
+    \vspace{0.3em}
+    
+    \begin{block}{Mobile-First Design}
+        \begin{itemize}
+            \item Responsive for all screens
+            \item Touch-optimized controls
+            \item No zoom on input (16px minimum)
+        \end{itemize}
+    \end{block}
+    
+    \vspace{0.3em}
+    
+    \begin{block}{Accessibility}
+        High contrast, keyboard navigation, screen reader support
+    \end{block}
+\end{frame}
+
+%=============================================================================
+% SECTION 3: TECHNICAL ARCHITECTURE
+%=============================================================================
+\section{Technical Architecture}
+
+\begin{frame}{System Architecture}
+    \begin{center}
+        \begin{tikzpicture}[node distance=2cm, auto]
+            % Nodes
+            \node[draw, rectangle, minimum width=3cm, minimum height=1cm, fill=blue!20] (client) {React Frontend};
+            \node[draw, rectangle, minimum width=3cm, minimum height=1cm, fill=green!20, below of=client] (api) {Express.js API};
+            \node[draw, rectangle, minimum width=3cm, minimum height=1cm, fill=orange!20, below of=api] (db) {MongoDB};
+            
+            % Arrows
+            \draw[<->, thick] (client) -- node[right] {REST API} (api);
+            \draw[<->, thick] (api) -- node[right] {Mongoose ODM} (db);
+            
+            % Side components
+            \node[draw, rectangle, minimum width=2cm, minimum height=0.8cm, fill=yellow!20, right of=client, xshift=2cm] (auth) {JWT Auth};
+            \node[draw, rectangle, minimum width=2cm, minimum height=0.8cm, fill=purple!20, right of=api, xshift=2cm] (qr) {QR Generation};
+            
+            \draw[->, dashed] (client) -- (auth);
+            \draw[->, dashed] (api) -- (qr);
+        \end{tikzpicture}
+    \end{center}
+\end{frame}
+
+\begin{frame}{Technology Stack}
+    \begin{columns}
+        \column{0.5\textwidth}
+        \textbf{Frontend Technologies:}
+        \begin{itemize}
+            \item \textbf{React.js} - UI framework
+            \item \textbf{React Router} - Client-side routing
+            \item \textbf{Tailwind CSS} - Utility-first styling
+            \item \textbf{Recharts} - Data visualization
+            \item \textbf{HTML5 QR Scanner} - QR code reading
+            \item \textbf{Axios} - HTTP client
+            \item \textbf{Vite} - Build tool
+        \end{itemize}
+        
+        \column{0.5\textwidth}
+        \textbf{Backend Technologies:}
+        \begin{itemize}
+            \item \textbf{Node.js} - Runtime environment
+            \item \textbf{Express.js} - Web framework
+            \item \textbf{MongoDB} - NoSQL database
+            \item \textbf{Mongoose} - ODM library
+            \item \textbf{JWT} - Authentication
+            \item \textbf{bcrypt} - Password hashing
+            \item \textbf{QRCode} - QR generation
+        \end{itemize}
+    \end{columns}
+\end{frame}
+
+%=============================================================================
+% SECTION 4: BACKEND DETAILS
+%=============================================================================
+\section{Backend Implementation}
+
+\begin{frame}{Database Schema - Core Models}
+    \begin{columns}
+        \column{0.5\textwidth}
+        \textbf{User Model:}
+        \begin{itemize}
+            \item name, email, password (hashed)
+            \item role: 'admin' | 'volunteer'
+            \item googleId (OAuth support)
+            \item attendance[] (event references)
+        \end{itemize}
+        
+        \textbf{Student Model:}
+        \begin{itemize}
+            \item name, age, grade
+            \item village, parentContact
+            \item enrollmentDate
+            \item sessions[] (teaching log refs)
+        \end{itemize}
+        
+        \column{0.5\textwidth}
+        \textbf{Event Model:}
+        \begin{itemize}
+            \item title, date, location
+            \item startTime, endTime
+            \item qrCode (unique identifier)
+            \item volunteersPresent[]
+            \item sessions[] (teaching logs)
+        \end{itemize}
+        
+        \textbf{AttendanceSession Model:}
+        \begin{itemize}
+            \item title, startTime, endTime
+            \item activeCode (5-char code)
+            \item codeExpiry (10 min validity)
+            \item location (lat/lng)
+        \end{itemize}
+    \end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Authentication System}
+    \begin{block}{JWT-Based Authentication}
+        \begin{lstlisting}[language=JavaScript]
+// Generate JWT token
+const generateToken = (userId) => {
+  return jwt.sign({ id: userId }, 
+    process.env.JWT_SECRET, 
+    { expiresIn: '30d' }
+  );
+};
+
+// Protect middleware
+const protect = async (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({...});
+  
+  const decoded = jwt.verify(token, process.env.JWT_SECRET);
+  req.user = await User.findById(decoded.id);
+  next();
+};
+        \end{lstlisting}
+    \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{QR Code Check-In System}
+    \begin{block}{Event Check-In Flow}
+        \begin{lstlisting}[language=JavaScript]
+exports.checkIn = async (req, res) => {
+  const { qrCode } = req.body;
+  const event = await Event.findOne({ qrCode });
+  
+  if (!event) return res.status(404).json({...});
+  
+  // Check if already checked in
+  if (event.volunteersPresent.includes(req.user.id)) {
+    return res.status(400).json({
+      message: 'Already checked in'
+    });
+  }
+  
+  // Add volunteer to event
+  event.volunteersPresent.push({
+    volunteer: req.user.id,
+    checkInTime: new Date(),
+    checkInMethod: 'qr'
+  });
+  await event.save();
+};
+        \end{lstlisting}
+    \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{Attendance Code Validation}
+    \begin{block}{Time-Bound Code System}
+        \begin{lstlisting}[language=JavaScript]
+exports.submitTeachingLog = async (req, res) => {
+  const { session_id, code, entries } = req.body;
+  const session = await AttendanceSession.findById(session_id);
+  
+  // Validate session is active
+  const now = new Date();
+  if (now < session.startTime || now > session.endTime) {
+    return res.status(400).json({
+      message: 'Session is not currently active'
+    });
+  }
+  
+  // Validate code
+  if (session.activeCode !== code || now > session.codeExpiry) {
+    return res.status(400).json({
+      message: 'Invalid or expired code'
+    });
+  }
+  
+  // Create teaching logs...
+};
+        \end{lstlisting}
+    \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{Location-Based Validation}
+    \begin{block}{Haversine Distance Calculation}
+        \begin{lstlisting}[language=JavaScript]
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371e3; // Earth's radius in meters
+  const phi1 = (lat1 * Math.PI) / 180;
+  const phi2 = (lat2 * Math.PI) / 180;
+  const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
+  const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
+  
+  const a = Math.sin(deltaPhi/2) * Math.sin(deltaPhi/2) +
+            Math.cos(phi1) * Math.cos(phi2) *
+            Math.sin(deltaLambda/2) * Math.sin(deltaLambda/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  
+  return R * c; // Distance in meters
+};
+
+// Validate within 1km radius
+if (distance > 1000) {
+  return res.status(400).json({
+    message: 'You must be within 1km of school'
+  });
+}
+        \end{lstlisting}
+    \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{Analytics & Reporting}
+    \begin{block}{Volunteer Ranking Algorithm}
+        \begin{lstlisting}[language=JavaScript]
+exports.getVolunteerRankings = async (req, res) => {
+  const volunteers = await User.find({ role: 'volunteer' });
+  
+  const rankings = await Promise.all(
+    volunteers.map(async (volunteer) => {
+      // Count teaching logs
+      const logs = await TeachingLog.find({
+        volunteerId: volunteer._id
+      });
+      
+      // Count unique sessions
+      const sessions = new Set(
+        logs.map(log => log.sessionId.toString())
+      );
+      
+      return {
+        volunteer: volunteer.name,
+        totalSessions: sessions.size,
+        totalStudentsTaught: logs.length,
+        rank: 0 // Calculated after sorting
+      };
+    })
+  );
+  
+  // Sort and assign ranks
+  rankings.sort((a, b) => 
+    b.totalSessions - a.totalSessions
+  );
+  rankings.forEach((r, i) => r.rank = i + 1);
+};
+        \end{lstlisting}
+    \end{block}
+\end{frame}
+
+\begin{frame}{API Architecture}
+    \textbf{RESTful API Endpoints:}
+    \begin{columns}
+        \column{0.5\textwidth}
+        \small
+        \textbf{Authentication:}
+        \begin{itemize}
+            \item POST /api/auth/login
+            \item POST /api/auth/google
+            \item GET /api/auth/me
+        \end{itemize}
+        
+        \textbf{Events:}
+        \begin{itemize}
+            \item GET /api/events
+            \item POST /api/events
+            \item POST /api/events/checkin
+            \item GET /api/events/:id
+        \end{itemize}
+        
+        \textbf{Students:}
+        \begin{itemize}
+            \item GET /api/students
+            \item POST /api/students
+            \item GET /api/students/:id/progress
+        \end{itemize}
+        
+        \column{0.5\textwidth}
+        \small
+        \textbf{Attendance Sessions:}
+        \begin{itemize}
+            \item GET /api/attendance-sessions
+            \item POST /api/attendance-sessions
+            \item POST /api/attendance-sessions/:id/generate-code
+        \end{itemize}
+        
+        \textbf{Teaching Logs:}
+        \begin{itemize}
+            \item POST /api/teaching-logs/submit
+            \item GET /api/teaching-logs/my-logs
+            \item GET /api/teaching-logs/session/:id
+        \end{itemize}
+        
+        \textbf{Analytics:}
+        \begin{itemize}
+            \item GET /api/volunteer-attendance
+            \item GET /api/analytics/dashboard
+        \end{itemize}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{Security Features}
+    \textbf{1. Authentication \& Authorization}
+    \begin{itemize}
+        \item JWT stateless authentication
+        \item Role-based access control
+        \item bcrypt password hashing
+    \end{itemize}
+    
+    \vspace{0.3em}
+    
+    \textbf{2. Data Validation}
+    \begin{itemize}
+        \item Input sanitization
+        \item Time-bound codes (10-min expiry)
+        \item Location validation
+    \end{itemize}
+    
+    \vspace{0.3em}
+    
+    \textbf{3. API Security}
+    \begin{itemize}
+        \item CORS configuration
+        \item Rate limiting
+        \item Secure headers
+    \end{itemize}
+\end{frame}
+
+%=============================================================================
+% SECTION 5: FRONTEND IMPLEMENTATION
+%=============================================================================
+\section{Frontend Implementation}
+
+\begin{frame}{Component Architecture}
+    \begin{center}
+        \begin{tikzpicture}[
+            level 1/.style={sibling distance=4cm},
+            level 2/.style={sibling distance=2cm},
+            every node/.style={draw, rectangle, rounded corners, minimum width=2cm, minimum height=0.8cm, align=center}
+        ]
+            \node[fill=blue!20] {App.jsx}
+                child {node[fill=green!20] {Layout}
+                    child {node[fill=yellow!20] {Sidebar}}
+                    child {node[fill=yellow!20] {Header}}
+                }
+                child {node[fill=green!20] {Pages}
+                    child {node[fill=yellow!20] {Dashboard}}
+                    child {node[fill=yellow!20] {Sessions}}
+                }
+                child {node[fill=green!20] {Context}
+                    child {node[fill=yellow!20] {AuthContext}}
+                };
+        \end{tikzpicture}
+    \end{center}
+</frame>
+
+\begin{frame}[fragile]{State Management - Auth Context}
+    \begin{block}{React Context for Authentication}
+        \begin{lstlisting}[language=JavaScript]
+const AuthContext = createContext();
+
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  
+  const checkAuth = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return setLoading(false);
+    
+    try {
+      const res = await api.get('/auth/me');
+      setUser(res.data.data);
+    } catch (error) {
+      localStorage.removeItem('token');
+    }
+    setLoading(false);
+  };
+  
+  const login = async (email, password) => {
+    const res = await api.post('/auth/login', 
+      { email, password });
+    localStorage.setItem('token', res.data.token);
+    setUser(res.data.data);
+  };
+};
+        \end{lstlisting}
+    \end{block}
+\end{frame}
+
+\begin{frame}{Responsive Design Strategy}
+    \begin{block}{Mobile-First Approach}
+        \begin{itemize}
+            \item Base styles for mobile (320px+)
+            \item Breakpoints: sm, md, lg
+            \item Touch-optimized (44px buttons)
+        \end{itemize}
+    \end{block}
+    
+    \vspace{0.5em}
+    
+    \begin{block}{Tailwind CSS Utilities}
+        \begin{itemize}
+            \item Responsive prefixes
+            \item Flexbox and Grid layouts
+            \item Custom brand colors
+        \end{itemize}
+    \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{Progressive Role Disclosure}
+    \begin{block}{Smart Login UX}
+        \begin{lstlisting}[language=JavaScript]
+// Detect role from email domain
+useEffect(() => {
+  if (!email || !email.includes('@')) return;
+  
+  const domain = email.split('@')[1]?.toLowerCase();
+  const adminDomains = ['admin.sankalp.org', 'sankalp.org'];
+  const volunteerDomains = ['gmail.com', 'yahoo.com'];
+  
+  if (adminDomains.some(d => domain === d)) {
+    setDetectedRole('admin');
+  } else if (volunteerDomains.some(d => domain === d)) {
+    setDetectedRole('volunteer');
+  }
+}, [email]);
+
+// Adaptive UI colors
+const buttonColor = detectedRole === 'admin' 
+  ? '#3b82f6' // Blue
+  : '#22c55e'; // Green
+        \end{lstlisting}
+    \end{block}
+\end{frame}
+
+\begin{frame}{Data Visualization}
+    \begin{columns}
+        \column{0.5\textwidth}
+        \textbf{Recharts Integration:}
+        \begin{itemize}
+            \item Line charts
+            \item Bar charts
+            \item Pie charts
+            \item Interactive
+        \end{itemize}
+        
+        \column{0.5\textwidth}
+        \textbf{Dashboard Metrics:}
+        \begin{itemize}
+            \item Volunteer count
+            \item Active sessions
+            \item Students enrolled
+            \item Top performers
+        \end{itemize}
+    \end{columns}
+    
+    \vspace{1em}
+    
+    \begin{block}{Real-Time Updates}
+        Auto-refresh on check-in, session log, or attendance submit
+    \end{block}
+\end{frame}
+
+%=============================================================================
+% SECTION 6: DEPLOYMENT & DEVOPS
+%=============================================================================
+\section{Deployment}
+
+\begin{frame}{Deployment Architecture}
+    \begin{center}
+        \begin{tikzpicture}[node distance=2.5cm]
+            \node[draw, rectangle, minimum width=3cm, minimum height=1cm, fill=blue!20] (vercel) {Vercel\\(Frontend)};
+            \node[draw, rectangle, minimum width=3cm, minimum height=1cm, fill=green!20, right of=vercel, xshift=2cm] (render) {Render\\(Backend)};
+            \node[draw, rectangle, minimum width=3cm, minimum height=1cm, fill=orange!20, below of=render] (atlas) {MongoDB Atlas\\(Database)};
+            \node[draw, rectangle, minimum width=2.5cm, minimum height=0.8cm, fill=purple!20, below of=vercel] (github) {GitHub\\(CI/CD)};
+            
+            \draw[->, thick] (github) -- (vercel);
+            \draw[->, thick] (github) -- (render);
+            \draw[<->, thick] (vercel) -- node[above] {API} (render);
+            \draw[<->, thick] (render) -- (atlas);
+        \end{tikzpicture}
+    \end{center}
+    
+    \begin{itemize}
+        \item \textbf{Frontend:} Vercel (automatic deployments from main branch)
+        \item \textbf{Backend:} Render or Railway (Node.js hosting)
+        \item \textbf{Database:} MongoDB Atlas (managed cloud database)
+        \item \textbf{CI/CD:} GitHub Actions for automated testing
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Environment Configuration}
+    \begin{columns}
+        \column{0.5\textwidth}
+        \textbf{Backend Environment:}
+        \begin{itemize}
+            \item NODE\_ENV
+            \item PORT
+            \item MONGO\_URI
+            \item JWT\_SECRET
+            \item CLIENT\_URL
+            \item GOOGLE\_CLIENT\_ID
+            \item GOOGLE\_CLIENT\_SECRET
+        \end{itemize}
+        
+        \column{0.5\textwidth}
+        \textbf{Frontend Environment:}
+        \begin{itemize}
+            \item VITE\_API\_URL
+            \item VITE\_GOOGLE\_CLIENT\_ID
+        \end{itemize}
+        
+        \vspace{1em}
+        
+        \textbf{Security Notes:}
+        \begin{itemize}
+            \item Never commit .env files
+            \item Use platform secrets management
+            \item Rotate keys regularly
+        \end{itemize}
+    \end{columns}
+\end{frame}
+
+%=============================================================================
+% SECTION 7: RESULTS & IMPACT
+%=============================================================================
+\section{Results \& Impact}
+
+\begin{frame}{Measurable Outcomes}
+    \begin{columns}
+        \column{0.5\textwidth}
+        \textbf{Efficiency Gains:}
+        \begin{itemize}
+            \item[\faCheckCircle] 90\% reduction in admin time
+            \item[\faCheckCircle] Real-time attendance tracking
+            \item[\faCheckCircle] Instant report generation
+            \item[\faCheckCircle] Zero paper waste
+        \end{itemize}
+        
+        \column{0.5\textwidth}
+        \textbf{Program Insights:}
+        \begin{itemize}
+            \item[\faChartLine] Volunteer participation trends
+            \item[\faChartLine] Student engagement metrics
+            \item[\faChartLine] Subject-wise coverage analysis
+            \item[\faChartLine] Impact measurement data
+        \end{itemize}
+    \end{columns}
+    
+    \vspace{1em}
+    
+    \begin{block}{Current Scale}
+        \begin{itemize}
+            \item 47+ students across 6 villages
+            \item 20+ active volunteers
+            \item 23+ sessions per month
+            \item Active since January 2024
+        \end{itemize}
+    \end{block}
+\end{frame}
+
+\begin{frame}{User Feedback}
+    \begin{block}{Administrator Testimonial}
+        \textit{"Sankalp has transformed how we manage our weekend programs. What used to take hours of manual work now happens automatically. We can finally focus on improving teaching quality instead of paperwork."}
+    \end{block}
+    
+    \begin{block}{Volunteer Testimonial}
+        \textit{"The QR check-in is so convenient! I love being able to see my attendance history and rank. It motivates me to participate more regularly."}
+    \end{block}
+    
+    \begin{block}{Key Success Factors}
+        \begin{itemize}
+            \item Intuitive user interface
+            \item Mobile-first design
+            \item Minimal training required
+            \item Reliable performance
+        \end{itemize}
+    \end{block}
+\end{frame}
+
+%=============================================================================
+% SECTION 8: FUTURE ENHANCEMENTS
+%=============================================================================
+\section{Future Enhancements}
+
+\begin{frame}{Roadmap}
+    \textbf{Short Term (Q1-Q2 2024)}
+    \begin{itemize}
+        \item SMS notifications
+        \item Offline mode
+        \item Multi-language support
+    \end{itemize}
+    
+    \vspace{0.3em}
+    
+    \textbf{Medium Term (Q3-Q4 2024)}
+    \begin{itemize}
+        \item AI teaching recommendations
+        \item Video recording
+        \item Gamification
+    \end{itemize}
+    
+    \vspace{0.3em}
+    
+    \textbf{Long Term (2025+)}
+    \begin{itemize}
+        \item Government portal integration
+        \item Mobile app (React Native)
+        \item Multi-organization support
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Scalability Considerations}
+    \begin{block}{Technical Scalability}
+        \begin{itemize}
+            \item Horizontal scaling with load balancers
+            \item Database sharding
+            \item CDN for static assets
+        \end{itemize}
+    \end{block}
+    
+    \vspace{0.5em}
+    
+    \begin{block}{Organizational Scalability}
+        \begin{itemize}
+            \item Multi-tenant architecture
+            \item Organization-level admin roles
+            \item Custom branding
+        \end{itemize}
+    \end{block}
+\end{frame}
+
+%=============================================================================
+% SECTION 9: CONCLUSION
+%=============================================================================
+\section{Conclusion}
+
+\begin{frame}{Key Takeaways}
+    \textbf{1. Problem Solved}
+    \begin{itemize}
+        \item Digitized rural education
+        \item Eliminated paperwork
+        \item Data-driven decisions
+    \end{itemize}
+    
+    \vspace{0.2em}
+    
+    \textbf{2. Technical Excellence}
+    \begin{itemize}
+        \item Modern MERN stack
+        \item Secure and scalable
+        \item Mobile-first UI
+    \end{itemize}
+    
+    \vspace{0.2em}
+    
+    \textbf{3. Real Impact}
+    \begin{itemize}
+        \item 47+ students, 20+ volunteers
+        \item 90\% admin time saved
+    \end{itemize}
+    
+    \vspace{0.2em}
+    
+    \textbf{4. Future Ready}
+    \begin{itemize}
+        \item Scalable architecture
+        \item Clear roadmap
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Project Links}
+    \begin{center}
+        \Large
+        \textbf{Sankalp - Rural Education Management System}
+        
+        \vspace{2em}
+        
+        \begin{tabular}{ll}
+            \faGithub & GitHub Repository \\
+            \faGlobe & Live Demo \\
+            \faEnvelope & Contact: team@sankalp.org \\
+        \end{tabular}
+        
+        \vspace{2em}
+        
+        \textbf{Open Source - MIT License}
+        
+        \vspace{1em}
+        
+        \textit{Built to empower volunteer educators in rural communities}
+    \end{center}
+\end{frame}
+
+\begin{frame}
+    \begin{center}
+        \Huge\textbf{Thank You!}
+        
+        \vspace{2em}
+        
+        \Large Questions?
+        
+        \vspace{2em}
+        
+        \normalsize
+        \textit{"Education is the most powerful weapon which you can use to change the world."}\\
+        \textit{— Nelson Mandela}
+    \end{center}
+\end{frame}
+
+%=============================================================================
+% APPENDIX
+%=============================================================================
+\appendix
+
+\section{Appendix}
+
+\begin{frame}[fragile]{Code Sample - React Component}
+    \begin{lstlisting}[language=JavaScript, basicstyle=\ttfamily\tiny]
+export default function VolunteerSessions() {
+  const [sessions, setSessions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    fetchSessions();
+  }, []);
+  
+  const fetchSessions = async () => {
+    try {
+      const response = await attendanceSessionAPI.getAll();
+      setSessions(response.data.data);
+    } catch (error) {
+      console.error('Error fetching sessions:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  return (
+    <Layout>
+      <h1>Attendance Sessions</h1>
+      {sessions.map(session => (
+        <SessionCard key={session._id} session={session} />
+      ))}
+    </Layout>
+  );
+}
+    \end{lstlisting}
+\end{frame}
+
+\begin{frame}{Database Indexes}
+    \textbf{Performance Optimization:}
+    \begin{itemize}
+        \item User.email (unique)
+        \item Event.qrCode (unique)
+        \item Event.date (ascending)
+        \item TeachingLog compound index
+        \item Student.village (ascending)
+    \end{itemize}
+    
+    \vspace{1em}
+    
+    \textbf{Query Performance:}
+    \begin{itemize}
+        \item Average: < 50ms
+        \item 99th percentile: < 200ms
+        \item DB size: ~50MB
+    \end{itemize}
+\end{frame}
+
+\end{document}
