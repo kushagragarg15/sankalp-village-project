@@ -4,39 +4,109 @@ const User = require('../models/User');
 
 const testVolunteers = [
   {
-    name: 'Test Volunteer 1',
-    email: 'volunteer1@gmail.com',
+    name: 'Rahul Sharma',
+    email: 'rahul.volunteer@gmail.com',
     password: 'volunteer123',
     role: 'volunteer',
     phone: '9876543210'
   },
   {
-    name: 'Test Volunteer 2',
-    email: 'volunteer2@gmail.com',
+    name: 'Priya Patel',
+    email: 'priya.volunteer@gmail.com',
     password: 'volunteer123',
     role: 'volunteer',
     phone: '9876543211'
   },
   {
-    name: 'Test Volunteer 3',
-    email: 'volunteer3@gmail.com',
+    name: 'Amit Kumar',
+    email: 'amit.volunteer@gmail.com',
     password: 'volunteer123',
     role: 'volunteer',
     phone: '9876543212'
   },
   {
-    name: 'John Doe',
-    email: 'john.volunteer@gmail.com',
+    name: 'Sneha Reddy',
+    email: 'sneha.volunteer@gmail.com',
     password: 'volunteer123',
     role: 'volunteer',
     phone: '9876543213'
   },
   {
-    name: 'Jane Smith',
-    email: 'jane.volunteer@gmail.com',
+    name: 'Vikram Singh',
+    email: 'vikram.volunteer@gmail.com',
     password: 'volunteer123',
     role: 'volunteer',
     phone: '9876543214'
+  },
+  {
+    name: 'Anjali Mehta',
+    email: 'anjali.volunteer@gmail.com',
+    password: 'volunteer123',
+    role: 'volunteer',
+    phone: '9876543215'
+  },
+  {
+    name: 'Arjun Gupta',
+    email: 'arjun.volunteer@gmail.com',
+    password: 'volunteer123',
+    role: 'volunteer',
+    phone: '9876543216'
+  },
+  {
+    name: 'Kavita Desai',
+    email: 'kavita.volunteer@gmail.com',
+    password: 'volunteer123',
+    role: 'volunteer',
+    phone: '9876543217'
+  },
+  {
+    name: 'Raj Malhotra',
+    email: 'raj.volunteer@gmail.com',
+    password: 'volunteer123',
+    role: 'volunteer',
+    phone: '9876543218'
+  },
+  {
+    name: 'Neha Kapoor',
+    email: 'neha.volunteer@gmail.com',
+    password: 'volunteer123',
+    role: 'volunteer',
+    phone: '9876543219'
+  },
+  {
+    name: 'Sanjay Verma',
+    email: 'sanjay.volunteer@gmail.com',
+    password: 'volunteer123',
+    role: 'volunteer',
+    phone: '9876543220'
+  },
+  {
+    name: 'Pooja Joshi',
+    email: 'pooja.volunteer@gmail.com',
+    password: 'volunteer123',
+    role: 'volunteer',
+    phone: '9876543221'
+  },
+  {
+    name: 'Karan Nair',
+    email: 'karan.volunteer@gmail.com',
+    password: 'volunteer123',
+    role: 'volunteer',
+    phone: '9876543222'
+  },
+  {
+    name: 'Divya Iyer',
+    email: 'divya.volunteer@gmail.com',
+    password: 'volunteer123',
+    role: 'volunteer',
+    phone: '9876543223'
+  },
+  {
+    name: 'Rohan Saxena',
+    email: 'rohan.volunteer@gmail.com',
+    password: 'volunteer123',
+    role: 'volunteer',
+    phone: '9876543224'
   }
 ];
 
@@ -74,11 +144,12 @@ const createTestVolunteers = async () => {
 
     if (created > 0) {
       console.log('🔐 Login Credentials:');
-      console.log('   Email: volunteer1@gmail.com');
-      console.log('   Email: volunteer2@gmail.com');
-      console.log('   Email: volunteer3@gmail.com');
-      console.log('   Email: john.volunteer@gmail.com');
-      console.log('   Email: jane.volunteer@gmail.com');
+      console.log('   Email: rahul.volunteer@gmail.com');
+      console.log('   Email: priya.volunteer@gmail.com');
+      console.log('   Email: amit.volunteer@gmail.com');
+      console.log('   Email: sneha.volunteer@gmail.com');
+      console.log('   Email: vikram.volunteer@gmail.com');
+      console.log('   ... and 10 more volunteer accounts');
       console.log('   Password: volunteer123 (for all accounts)\n');
     }
 

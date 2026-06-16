@@ -16,12 +16,6 @@ const testStudents = [
     parentPhone: '9876543202',
     enrollmentDate: new Date('2024-01-15')
   },
-  {
-    name: 'Arjun Patel',
-    grade: 'Grade 1',
-    parentPhone: '9876543203',
-    enrollmentDate: new Date('2024-01-20')
-  },
   
   // Grade 2
   {
@@ -35,12 +29,6 @@ const testStudents = [
     grade: 'Grade 2',
     parentPhone: '9876543205',
     enrollmentDate: new Date('2024-01-18')
-  },
-  {
-    name: 'Saanvi Reddy',
-    grade: 'Grade 2',
-    parentPhone: '9876543206',
-    enrollmentDate: new Date('2024-01-22')
   },
   
   // Grade 3
@@ -62,12 +50,6 @@ const testStudents = [
     parentPhone: '9876543209',
     enrollmentDate: new Date('2024-01-19')
   },
-  {
-    name: 'Myra Desai',
-    grade: 'Grade 3',
-    parentPhone: '9876543210',
-    enrollmentDate: new Date('2024-01-21')
-  },
   
   // Grade 4
   {
@@ -81,12 +63,6 @@ const testStudents = [
     grade: 'Grade 4',
     parentPhone: '9876543212',
     enrollmentDate: new Date('2024-01-17')
-  },
-  {
-    name: 'Shaurya Nair',
-    grade: 'Grade 4',
-    parentPhone: '9876543213',
-    enrollmentDate: new Date('2024-01-20')
   },
   
   // Grade 5
@@ -102,18 +78,6 @@ const testStudents = [
     parentPhone: '9876543215',
     enrollmentDate: new Date('2024-01-16')
   },
-  {
-    name: 'Kiara Bose',
-    grade: 'Grade 5',
-    parentPhone: '9876543216',
-    enrollmentDate: new Date('2024-01-18')
-  },
-  {
-    name: 'Ayaan Saxena',
-    grade: 'Grade 5',
-    parentPhone: '9876543217',
-    enrollmentDate: new Date('2024-01-22')
-  },
   
   // Grade 6
   {
@@ -128,12 +92,6 @@ const testStudents = [
     parentPhone: '9876543219',
     enrollmentDate: new Date('2024-01-17')
   },
-  {
-    name: 'Riya Mishra',
-    grade: 'Grade 6',
-    parentPhone: '9876543220',
-    enrollmentDate: new Date('2024-01-19')
-  },
   
   // Grade 7
   {
@@ -142,18 +100,6 @@ const testStudents = [
     parentPhone: '9876543221',
     enrollmentDate: new Date('2024-01-15')
   },
-  {
-    name: 'Anvi Thakur',
-    grade: 'Grade 7',
-    parentPhone: '9876543222',
-    enrollmentDate: new Date('2024-01-16')
-  },
-  {
-    name: 'Arnav Jain',
-    grade: 'Grade 7',
-    parentPhone: '9876543223',
-    enrollmentDate: new Date('2024-01-20')
-  },
   
   // Grade 8
   {
@@ -161,18 +107,6 @@ const testStudents = [
     grade: 'Grade 8',
     parentPhone: '9876543224',
     enrollmentDate: new Date('2024-01-15')
-  },
-  {
-    name: 'Ishaan Sinha',
-    grade: 'Grade 8',
-    parentPhone: '9876543225',
-    enrollmentDate: new Date('2024-01-18')
-  },
-  {
-    name: 'Avni Bhatt',
-    grade: 'Grade 8',
-    parentPhone: '9876543226',
-    enrollmentDate: new Date('2024-01-21')
   }
 ];
 
