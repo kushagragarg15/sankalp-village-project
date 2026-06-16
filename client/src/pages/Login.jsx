@@ -104,17 +104,14 @@ export default function Login() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#F5F4F0',
+        backgroundColor: '#FFFFFF',
         fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
-        padding: '24px'
+        padding: '48px 24px'
       }}>
-        {/* Centered Login Card */}
+        {/* Centered Login Form */}
         <div style={{
           width: '100%',
-          maxWidth: '440px',
-          backgroundColor: '#FFFFFF',
-          padding: '48px',
-          borderRadius: '4px'
+          maxWidth: '440px'
         }}>
           {/* Logo + Brand */}
           <div style={{ 
