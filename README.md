@@ -20,7 +20,7 @@ Sankalp is a full-stack web application designed to coordinate weekend teaching 
 - **Session Logging**: Record teaching sessions with student attendance
 - **Attendance History**: View personal participation records
 - **Student Progress Tracking**: Monitor individual student development
-- **Teaching Notes Generator**: Create structured lesson plans
+- **RAG-Powered Teaching Notes Generator**: Create structured lesson plans grounded in curated teaching resources using Retrieval-Augmented Generation (RAG)
 
 ## Tech Stack
 
@@ -35,6 +35,7 @@ Sankalp is a full-stack web application designed to coordinate weekend teaching 
 - MongoDB with Mongoose ODM
 - JWT authentication
 - bcrypt password hashing
+- OpenAI API integration (RAG-powered lesson planning)
 
 ## Getting Started
 
@@ -81,9 +82,10 @@ npm install
 ```bash
 cd server
 npm run seed
+npm run seed-resources  # Seeds teaching resources for RAG
 ```
 
-This creates sample data including admin and volunteer accounts, students, and sessions.
+This creates sample data including admin and volunteer accounts, students, sessions, and teaching resources.
 
 5. **Start the application**
 
@@ -161,9 +163,27 @@ sankalps-village-project/
 - `GET /api/analytics/dashboard` - Dashboard statistics
 - `GET /api/analytics/impact` - Impact metrics
 
+### AI/RAG
+- `POST /api/ai/generate-notes` - Generate lesson plan using RAG
+- `GET /api/ai/resources` - List teaching resources
+- `POST /api/ai/resources` - Create teaching resource (Admin)
+
+## RAG-Powered Lesson Planning
+
+This platform includes a Retrieval-Augmented Generation (RAG) system for creating grounded, source-backed lesson plans:
+
+- **Curated Resource Library**: Admin-seeded teaching resources covering Math, Science, and English for Classes 3-5
+- **Semantic Search**: Retrieves relevant teaching materials based on topic, subject, and grade
+- **Source Attribution**: Shows volunteers which resources informed the generated lesson plan
+- **Transparent AI**: Displays similarity scores and source snippets for full transparency
+
+For technical details and interview prep, see:
+- **[RAG_NOTES.md](RAG_NOTES.md)** - Technical implementation overview and glossary
+- **[RAG_IMPLEMENTATION_SUMMARY.md](RAG_IMPLEMENTATION_SUMMARY.md)** - Complete feature summary and usage guide
+
 ## Deployment
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions for various platforms.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions for various platforms (if available).
 
 ## Contributing
 

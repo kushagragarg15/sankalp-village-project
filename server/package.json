@@ -13,6 +13,7 @@
     "create-test-volunteers": "node scripts/createTestVolunteers.js",
     "create-test-students": "node scripts/createTestStudents.js",
     "create-test-data": "npm run create-test-volunteers && npm run create-test-students",
+    "seed-resources": "node scripts/seedResources.js",
     "update-user-role": "node scripts/updateUserRole.js",
     "update-all-roles": "node scripts/updateAllUserRoles.js"
   },

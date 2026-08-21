@@ -7,17 +7,20 @@ export default function AITeachingNotes() {
   const [formData, setFormData] = useState({
     topic: '',
     grade: 'Class 5',
-    subject: 'Math'
+    subject: 'Math',
+    extraInstructions: ''
   });
   const [notes, setNotes] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showSources, setShowSources] = useState(false);
 
   const handleGenerate = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     setNotes(null);
+    setShowSources(false);
 
     try {
       const response = await api.post('/ai/generate-notes', formData);
@@ -91,6 +94,19 @@ export default function AITeachingNotes() {
                   <option value="Other">Other</option>
                 </Select>
 
+                <div>
+                  <label className="block text-[13px] font-medium text-[#111111] mb-1.5">
+                    Additional Instructions (Optional)
+                  </label>
+                  <textarea
+                    value={formData.extraInstructions}
+                    onChange={(e) => setFormData({ ...formData, extraInstructions: e.target.value })}
+                    placeholder="e.g., Focus on visual learning, include a song"
+                    rows={3}
+                    className="w-full px-3 py-2 text-[13px] border border-[#e4e4e4] rounded-md focus:outline-none focus:ring-1 focus:ring-[#111111] focus:border-transparent resize-none"
+                  />
+                </div>
+
                 <button
                   type="submit"
                   disabled={loading}
@@ -148,6 +164,44 @@ export default function AITeachingNotes() {
                     </p>
                   </div>
 
+                  {/* RAG Sources Section */}
+                  {notes.sources && notes.sources.length > 0 && (
+                    <div className="mb-4 pb-4 border-b border-[#f0f0f0]">
+                      <button
+                        onClick={() => setShowSources(!showSources)}
+                        className="flex items-center gap-2 text-[13px] font-medium text-[#111111] hover:text-[#2a2a2a] transition-colors"
+                      >
+                        <span>📚 Grounded in {notes.sources.length} teaching resource{notes.sources.length > 1 ? 's' : ''}</span>
+                        <span className="text-[#9a9a9a]">{showSources ? '▼' : '▶'}</span>
+                      </button>
+                      
+                      {showSources && (
+                        <div className="mt-3 space-y-2">
+                          {notes.sources.map((source, idx) => (
+                            <div key={idx} className="p-3 bg-[#fafafa] rounded-md border border-[#f0f0f0]">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1">
+                                  <p className="text-[12px] font-medium text-[#111111]">
+                                    {source.label}
+                                  </p>
+                                  <p className="text-[11px] text-[#6b6b6b] mt-1 line-clamp-2">
+                                    {source.snippet}
+                                  </p>
+                                </div>
+                                <span className="text-[10px] text-[#9a9a9a] font-mono shrink-0">
+                                  {(parseFloat(source.similarity) * 100).toFixed(0)}%
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                          <p className="text-[11px] text-[#9a9a9a] italic mt-2">
+                            These resources were retrieved and used to generate your lesson plan.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="space-y-4">
                     <div className="whitespace-pre-wrap text-[#111111] text-sm leading-relaxed">
                       {notes.notes}
@@ -157,6 +211,9 @@ export default function AITeachingNotes() {
                   <div className="mt-6 pt-4 border-t border-[#f0f0f0]">
                     <p className="text-xs text-[#9a9a9a]">
                       Generated on {new Date(notes.generatedAt).toLocaleString()}
+                      {notes.sources && notes.sources.length > 0 && 
+                        ` • RAG-powered with ${notes.sources.length} source${notes.sources.length > 1 ? 's' : ''}`
+                      }
                     </p>
                   </div>
                 </div>
