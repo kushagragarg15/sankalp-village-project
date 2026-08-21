@@ -116,3 +116,12 @@ public/
 # Temporary folders
 tmp/
 temp/
+
+# Internal documentation (not for public/interviewers)
+BACKEND_FLOW_DOCUMENTATION.md
+EVENTS_VS_ATTENDANCE_SESSIONS.md
+PRESENTATION_IMAGES.md
+PROJECT_PROPOSAL.md
+INTERVIEW_PREP_GUIDE.md
+interview_prep_handbook.tex
+presentation.tex

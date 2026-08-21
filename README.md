@@ -177,13 +177,9 @@ This platform includes a Retrieval-Augmented Generation (RAG) system for creatin
 - **Source Attribution**: Shows volunteers which resources informed the generated lesson plan
 - **Transparent AI**: Displays similarity scores and source snippets for full transparency
 
-For technical details and interview prep, see:
-- **[RAG_NOTES.md](RAG_NOTES.md)** - Technical implementation overview and glossary
-- **[RAG_IMPLEMENTATION_SUMMARY.md](RAG_IMPLEMENTATION_SUMMARY.md)** - Complete feature summary and usage guide
+For technical details, see **[RAG_NOTES.md](RAG_NOTES.md)** - concise implementation overview optimized for technical interviews.
 
 ## Deployment
-
-See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions for various platforms (if available).
 
 ## Contributing
 
