@@ -49,7 +49,11 @@ export default function Dashboard() {
             ? isAdmin
               ? 'Read the code below out to the room. It changes every ten minutes.'
               : 'Head to the session to record who you taught before it closes.'
-            : `Nothing is running right now, ${firstName}. Here is what is coming up.`
+            : upcoming.length > 0
+              ? `Nothing is running right now, ${firstName}. Here is what is coming up.`
+              : isAdmin
+                ? `Nothing is running, ${firstName}, and nothing is scheduled yet. Open the next weekend's session when you are ready.`
+                : `Nothing is running right now, ${firstName}. Your coordinator will open the next session before the weekend.`
         }
       >
         <p className="text-[13px] text-ink-2 mb-2">{formatDayLong(new Date())}</p>

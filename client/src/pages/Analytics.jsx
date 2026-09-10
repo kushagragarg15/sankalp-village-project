@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import api from '../utils/api';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import LoadingState from '../components/LoadingState';
@@ -24,81 +23,58 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { isLive } from '../utils/session';
+import { analyticsAPI } from '../utils/api';
 
 const tickStyle = { fontSize: 12, fill: AXIS, fontFamily: 'Archivo, sans-serif' };
 
-function rankBy(logs, pick, limit = 8) {
-  const counts = {};
-  logs.forEach((log) => {
-    const key = pick(log);
-    if (!key) return;
-    counts[key] = (counts[key] || 0) + 1;
-  });
-  return Object.entries(counts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, limit)
-    .map(([name, lessons]) => ({ name, lessons }));
-}
-
 export default function Analytics() {
-  const [sessions, setSessions] = useState([]);
-  const [logs, setLogs] = useState([]);
-  const [counts, setCounts] = useState({ volunteers: 0, students: 0 });
+  const [overview, setOverview] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
-        const [sessionsRes, logsRes, usersRes, studentsRes] = await Promise.all([
-          api.get('/attendance-sessions'),
-          api.get('/teaching-logs'),
-          api.get('/users'),
-          api.get('/students'),
-        ]);
-        setSessions(sessionsRes.data.data || []);
-        setLogs(logsRes.data.data || []);
-        setCounts({
-          volunteers: (usersRes.data.data || []).filter((u) => u.role === 'volunteer')
-            .length,
-          students: (studentsRes.data.data || []).length,
-        });
-      } catch {
-        setSessions([]);
-        setLogs([]);
+        const response = await analyticsAPI.overview();
+        if (!cancelled) setOverview(response.data.data);
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err.response?.data?.message || 'Insights could not be loaded right now.'
+          );
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
+  // The server returns only the days that had lessons; fill the rest so the
+  // trend line shows the real shape of the month.
   const activity = useMemo(() => {
+    if (!overview) return [];
+    const byDate = new Map(overview.daily.map((d) => [d.date, d]));
     const days = [];
+
     for (let i = 29; i >= 0; i -= 1) {
       const date = new Date();
       date.setHours(0, 0, 0, 0);
       date.setDate(date.getDate() - i);
-      const key = date.toDateString();
-
-      const dayLogs = logs.filter(
-        (log) => new Date(log.timestamp).toDateString() === key
-      );
+      const key = date.toISOString().slice(0, 10);
+      const hit = byDate.get(key);
 
       days.push({
         date: date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
-        lessons: dayLogs.length,
-        children: new Set(dayLogs.map((l) => l.studentId?._id)).size,
+        lessons: hit?.lessons || 0,
+        children: hit?.children || 0,
       });
     }
     return days;
-  }, [logs]);
-
-  const subjects = useMemo(() => rankBy(logs, (l) => l.subject, 8), [logs]);
-  const volunteers = useMemo(
-    () => rankBy(logs, (l) => l.volunteerId?.name, 8),
-    [logs]
-  );
-  const students = useMemo(() => rankBy(logs, (l) => l.studentId?.name, 8), [logs]);
+  }, [overview]);
 
   if (loading) {
     return (
@@ -108,6 +84,7 @@ export default function Analytics() {
     );
   }
 
+  const totals = overview?.totals;
   const hasActivity = activity.some((d) => d.lessons > 0);
 
   return (
@@ -117,22 +94,30 @@ export default function Analytics() {
         lede="What the register adds up to: how often the club teaches, who turns up, and which children are being reached."
       />
 
-      <StatStrip
-        className="mb-8"
-        items={[
-          { label: 'Lessons recorded', value: logs.length },
-          { label: 'Children enrolled', value: counts.students },
-          { label: 'Volunteers', value: counts.volunteers },
-          {
-            label: 'Sessions run',
-            value: sessions.length,
-            note: sessions.some(isLive) ? 'one running now' : undefined,
-            accent: sessions.some(isLive),
-          },
-        ]}
-      />
+      {error && (
+        <div role="alert" className="mb-6 rounded-lg border border-brick-line bg-brick-wash px-4 py-3">
+          <p className="text-sm text-brick">{error}</p>
+        </div>
+      )}
 
-      {logs.length === 0 ? (
+      {totals && (
+        <StatStrip
+          className="mb-8"
+          items={[
+            { label: 'Lessons recorded', value: totals.lessons },
+            { label: 'Children enrolled', value: totals.students },
+            { label: 'Volunteers', value: totals.volunteers },
+            {
+              label: 'Sessions run',
+              value: totals.sessions,
+              note: totals.liveSessions > 0 ? 'one running now' : undefined,
+              accent: totals.liveSessions > 0,
+            },
+          ]}
+        />
+      )}
+
+      {!totals || totals.lessons === 0 ? (
         <EmptyState
           title="Nothing to measure yet"
           description="Once volunteers start recording lessons, this page shows how the club's teaching adds up over time."
@@ -201,29 +186,29 @@ export default function Analytics() {
             <ChartFrame
               title="Subjects taught"
               note="Lessons recorded per subject."
-              empty={subjects.length === 0}
+              empty={overview.subjects.length === 0}
               emptyNote="No subjects recorded yet."
             >
-              <RankedBars data={subjects} />
+              <RankedBars data={overview.subjects} />
             </ChartFrame>
 
             <ChartFrame
               title="Volunteers by lessons taught"
               note="The eight who have recorded the most."
-              empty={volunteers.length === 0}
+              empty={overview.volunteers.length === 0}
               emptyNote="No volunteer activity yet."
             >
-              <RankedBars data={volunteers} />
+              <RankedBars data={overview.volunteers} />
             </ChartFrame>
           </div>
 
           <ChartFrame
             title="Children reached most often"
             note="The eight students with the most recorded lessons."
-            empty={students.length === 0}
+            empty={overview.students.length === 0}
             emptyNote="No student activity yet."
           >
-            <RankedBars data={students} />
+            <RankedBars data={overview.students} />
           </ChartFrame>
         </div>
       )}

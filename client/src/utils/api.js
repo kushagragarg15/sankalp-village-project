@@ -67,6 +67,19 @@ export const teachingLogAPI = {
 // Students API (if not already exists)
 export const getStudents = () => api.get('/students');
 
+// Aggregated insights — one call, computed server-side, readable by any member.
+export const analyticsAPI = {
+  overview: () => api.get('/analytics/overview')
+};
+
+// User administration (admin only)
+export const userAPI = {
+  getAll: () => api.get('/users'),
+  create: (data) => api.post('/users', data),
+  update: (id, data) => api.put(`/users/${id}`, data),
+  remove: (id) => api.delete(`/users/${id}`)
+};
+
 // Volunteer Attendance API
 export const volunteerAttendanceAPI = {
   getAll: () => api.get('/volunteer-attendance'),

@@ -1,6 +1,28 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const passport = require('../config/passport');
+const { OAuth2Client } = require('google-auth-library');
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+// Set and clear must use identical attributes, or the browser treats them as
+// different cookies and logout leaves the original one in place.
+const cookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+});
+
+// One shape for the signed-in user, so /auth/login, /auth/google and /auth/me
+// all hand the client the same thing.
+const publicUser = (user) => ({
+  _id: user._id,
+  id: String(user._id),
+  name: user.name,
+  email: user.email,
+  role: user.role,
+  phone: user.phone
+});
 
 // Generate JWT token
 const generateToken = (id) => {
@@ -49,22 +71,14 @@ exports.login = async (req, res, next) => {
 
     // Set cookie with token (httpOnly for security)
     res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      ...cookieOptions(),
       maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
     });
 
     res.status(200).json({
       success: true,
       token: token, // Also send token in response for localStorage fallback
-      data: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        phone: user.phone
-      }
+      data: publicUser(user)
     });
   } catch (error) {
     next(error);
@@ -76,10 +90,7 @@ exports.login = async (req, res, next) => {
 // @access  Private
 exports.logout = async (req, res, next) => {
   try {
-    res.cookie('token', 'none', {
-      expires: new Date(Date.now() + 10 * 1000),
-      httpOnly: true
-    });
+    res.clearCookie('token', cookieOptions());
 
     res.status(200).json({
       success: true,
@@ -120,51 +131,67 @@ exports.googleAuth = async (req, res, next) => {
       });
     }
 
-    // Decode the JWT token from Google
-    const decoded = jwt.decode(credential);
-
-    if (!decoded || !decoded.email) {
-      return res.status(400).json({
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      return res.status(503).json({
         success: false,
-        message: 'Invalid credential'
+        message: 'Google sign-in is not configured on the server.'
       });
     }
 
-    // Determine role based on email pattern
-    const email = decoded.email;
-    let role = 'volunteer'; // Default role
-    
-    // Check if email starts with 23 or 24 (admin access)
-    if (email.startsWith('23') || email.startsWith('24')) {
-      role = 'admin';
-    }
-    // Check if email starts with 25 or 26 (volunteer access)
-    else if (email.startsWith('25') || email.startsWith('26')) {
-      role = 'volunteer';
+    // Verify the credential against Google's signing keys.
+    //
+    // This was `jwt.decode(credential)`, which only base64-decodes the payload
+    // and verifies nothing — anyone could hand the server a self-made token
+    // claiming any email address and be signed in as that person.
+    let payload;
+    try {
+      const ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: process.env.GOOGLE_CLIENT_ID
+      });
+      payload = ticket.getPayload();
+    } catch (error) {
+      return res.status(401).json({
+        success: false,
+        message: 'Google sign-in could not be verified. Please try again.'
+      });
     }
 
-    // Check if user exists
-    let user = await User.findOne({ email: decoded.email });
+    if (!payload?.email || !payload.email_verified) {
+      return res.status(401).json({
+        success: false,
+        message: 'That Google account does not have a verified email address.'
+      });
+    }
+
+    const email = payload.email.toLowerCase();
+
+    // Optionally restrict sign-in to the institute domain.
+    const allowedDomain = process.env.ALLOWED_EMAIL_DOMAIN;
+    if (allowedDomain && !email.endsWith(`@${allowedDomain.toLowerCase()}`)) {
+      return res.status(403).json({
+        success: false,
+        message: `Sign in with your @${allowedDomain} account.`
+      });
+    }
+
+    let user = await User.findOne({ email });
 
     if (!user) {
-      // Create new user with role based on email pattern
+      // Everyone starts as a volunteer. Admin is granted deliberately by an
+      // existing admin; it is never inferred from the address, which used to
+      // make every 2023/24 batch email an administrator of the whole club.
       user = await User.create({
-        googleId: decoded.sub,
-        name: decoded.name,
-        email: decoded.email,
-        role: role,
+        googleId: payload.sub,
+        name: payload.name || email.split('@')[0],
+        email,
+        role: 'volunteer'
       });
     } else if (!user.googleId) {
-      // Link Google account to existing user and update role if needed
-      user.googleId = decoded.sub;
-      
-      // Update role based on email pattern if it matches the criteria
-      if (email.startsWith('23') || email.startsWith('24')) {
-        user.role = 'admin';
-      } else if (email.startsWith('25') || email.startsWith('26')) {
-        user.role = 'volunteer';
-      }
-      
+      // Link the Google identity to the existing account, and leave the role
+      // untouched: signing in must never change someone's permissions, or a
+      // deliberate demotion is silently undone at their next login.
+      user.googleId = payload.sub;
       await user.save();
     }
 
@@ -173,22 +200,14 @@ exports.googleAuth = async (req, res, next) => {
 
     // Set cookie with token
     res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      ...cookieOptions(),
       maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
     });
 
     res.status(200).json({
       success: true,
       token: token,
-      data: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        phone: user.phone
-      }
+      data: publicUser(user)
     });
   } catch (error) {
     next(error);

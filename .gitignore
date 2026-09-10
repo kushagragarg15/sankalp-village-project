@@ -10,6 +10,10 @@ pnpm-lock.yaml
 .env.production
 .env.*.local
 server/.env
+# Catch backups and variants too — .env.backup / .env.old would otherwise be
+# committed with live secrets in them.
+.env.*
+!.env.example
 
 # Build outputs
 dist/

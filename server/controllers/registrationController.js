@@ -1,5 +1,6 @@
 const Registration = require('../models/Registration');
 const AttendanceSession = require('../models/AttendanceSession');
+const TeachingLog = require('../models/TeachingLog');
 
 // @desc    Register volunteer for session
 // @route   POST /api/registrations/register
@@ -15,8 +16,11 @@ exports.registerForSession = async (req, res, next) => {
       });
     }
 
-    // Check if session exists
-    const session = await AttendanceSession.findById(sessionId);
+    const [session, existingRegistration] = await Promise.all([
+      AttendanceSession.findById(sessionId).lean(),
+      Registration.findOne({ userId: req.user.id, sessionId }).lean()
+    ]);
+
     if (!session) {
       return res.status(404).json({
         success: false,
@@ -24,16 +28,19 @@ exports.registerForSession = async (req, res, next) => {
       });
     }
 
-    // Check if already registered
-    const existingRegistration = await Registration.findOne({
-      userId: req.user.id,
-      sessionId
-    });
+    // Registering for a session that has already finished cannot lead
+    // anywhere: attendance can only be recorded inside the session window.
+    if (new Date() > session.endTime) {
+      return res.status(400).json({
+        success: false,
+        message: 'This session has already closed.'
+      });
+    }
 
     if (existingRegistration) {
       return res.status(400).json({
         success: false,
-        message: 'Already registered for this session'
+        message: 'You are already registered for this session'
       });
     }
 
@@ -109,6 +116,21 @@ exports.unregister = async (req, res, next) => {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to delete this registration'
+      });
+    }
+
+    // Attendance may only be submitted by a registered volunteer, so removing
+    // the registration after the fact would leave teaching logs that violate
+    // the rule they were checked against.
+    const alreadyTaught = await TeachingLog.exists({
+      volunteerId: req.user.id,
+      sessionId: registration.sessionId
+    });
+
+    if (alreadyTaught) {
+      return res.status(400).json({
+        success: false,
+        message: 'You have already recorded attendance for this session, so it cannot be withdrawn.'
       });
     }
 

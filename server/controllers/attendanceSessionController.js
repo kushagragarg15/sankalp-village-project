@@ -3,6 +3,17 @@ const AttendanceSession = require('../models/AttendanceSession');
 // How long an issued code stays valid.
 const CODE_TTL_MS = 10 * 60 * 1000;
 
+// The code exists to prove a volunteer is physically in the room, so only
+// coordinators may read it. Returning it to everyone made it prove nothing:
+// any volunteer could pull it from the API from anywhere.
+const withoutCode = (session) => {
+  const { activeCode, codeExpiry, ...rest } = session;
+  return rest;
+};
+
+const forViewer = (sessions, user) =>
+  user?.role === 'admin' ? sessions : sessions.map(withoutCode);
+
 // Generate random 5-character code
 const generateRandomCode = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -141,7 +152,7 @@ exports.getAllSessions = async (req, res, next) => {
     res.status(200).json({
       success: true,
       count: sessions.length,
-      data: sessions
+      data: forViewer(sessions, req.user)
     });
   } catch (error) {
     next(error);
@@ -166,7 +177,7 @@ exports.getSession = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      data: session
+      data: req.user?.role === 'admin' ? session : withoutCode(session)
     });
   } catch (error) {
     next(error);

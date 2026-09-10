@@ -197,7 +197,7 @@ export default function AttendanceReport() {
                   <Table minWidth={720}>
                     <TableHead>
                       <tr>
-                        <TableHeader className="w-20">Time</TableHeader>
+                        <TableHeader className="w-24">Time</TableHeader>
                         <TableHeader>Student</TableHeader>
                         <TableHeader>Class</TableHeader>
                         <TableHeader>Volunteer</TableHeader>
@@ -208,7 +208,7 @@ export default function AttendanceReport() {
                     <TableBody>
                       {dayLogs.map((log, index) => (
                         <TableRow key={index}>
-                          <TableCell className="font-mono text-[13px] text-ink-2 tabular-nums">
+                          <TableCell className="font-mono text-[13px] text-ink-2 tabular-nums whitespace-nowrap">
                             {formatTime(log.timestamp)}
                           </TableCell>
                           <TableCell className="font-medium">

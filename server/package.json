@@ -15,7 +15,8 @@
     "create-test-data": "npm run create-test-volunteers && npm run create-test-students",
     "seed-resources": "node scripts/seedResources.js",
     "update-user-role": "node scripts/updateUserRole.js",
-    "update-all-roles": "node scripts/updateAllUserRoles.js"
+    "update-all-roles": "node scripts/updateAllUserRoles.js",
+    "seed-club-data": "node scripts/seedClubData.js"
   },
   "keywords": [
     "education",
@@ -31,6 +32,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "google-auth-library": "^11.0.2",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.3.2",
     "openai": "^4.38.5",

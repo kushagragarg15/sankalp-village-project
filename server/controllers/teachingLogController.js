@@ -2,6 +2,12 @@ const TeachingLog = require('../models/TeachingLog');
 const AttendanceSession = require('../models/AttendanceSession');
 const Registration = require('../models/Registration');
 
+// Where attendance may be recorded, when a session carries no location of its
+// own. Overridable so the club can move sites without a code change.
+const DEFAULT_SCHOOL_LAT = Number(process.env.SCHOOL_LAT || 26.933531637176955);
+const DEFAULT_SCHOOL_LNG = Number(process.env.SCHOOL_LNG || 75.9162266441557);
+const ALLOWED_RADIUS_M = Number(process.env.ATTENDANCE_RADIUS_M || 1000);
+
 // Haversine formula to calculate distance between two coordinates (in meters)
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
   const R = 6371e3; // Earth's radius in meters
@@ -95,25 +101,35 @@ exports.submitTeachingLog = async (req, res, next) => {
       });
     }
 
-    // 5. Validate location (fixed school coordinates with 1km radius for testing)
-    const SCHOOL_LAT = 26.933531637176955;
-    const SCHOOL_LNG = 75.9162266441557;
-    const ALLOWED_RADIUS = 1000; // meters (1km for testing)
+    // 5. Validate location.
+    //
+    // This used to be wrapped in `if (lat && lng)`, so a client that simply
+    // omitted the coordinates skipped the check entirely — the geofence was
+    // advisory, not enforced. Attendance is meant to prove someone was at the
+    // school, so missing coordinates are now a refusal rather than a bypass.
+    // (A latitude of exactly 0 also failed the old truthiness test.)
+    if (typeof lat !== 'number' || typeof lng !== 'number' ||
+        Number.isNaN(lat) || Number.isNaN(lng)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Location is required to record attendance. Enable location access and try again.'
+      });
+    }
 
-    if (lat && lng) {
-      const distance = calculateDistance(
-        SCHOOL_LAT,
-        SCHOOL_LNG,
-        lat,
-        lng
-      );
+    // Prefer the session's own coordinates; the fixed pair is only a fallback
+    // for sessions created before locations were recorded.
+    const origin = {
+      lat: typeof session.location?.lat === 'number' ? session.location.lat : DEFAULT_SCHOOL_LAT,
+      lng: typeof session.location?.lng === 'number' ? session.location.lng : DEFAULT_SCHOOL_LNG
+    };
 
-      if (distance > ALLOWED_RADIUS) {
-        return res.status(400).json({
-          success: false,
-          message: `You must be within ${ALLOWED_RADIUS} meters of the school location. Current distance: ${Math.round(distance)}m`
-        });
-      }
+    const distance = calculateDistance(origin.lat, origin.lng, lat, lng);
+
+    if (distance > ALLOWED_RADIUS_M) {
+      return res.status(400).json({
+        success: false,
+        message: `You need to be at the school to record attendance. You are about ${Math.round(distance)}m away.`
+      });
     }
 
     // 6. Insert every entry in one unordered batch.

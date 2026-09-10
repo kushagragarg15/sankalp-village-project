@@ -21,11 +21,16 @@ npm run dev                    # nodemon server.js  (http://localhost:5000)
 npm start                      # node server.js (production)
 
 # DB utility scripts (each connects using MONGO_URI, does its work, exits):
+npm run seed-club-data         # rebuild a realistic term of weekend sessions, students and
+                               # teaching logs (Aug 2026 -> today). PRESERVES accounts that
+                               # have a googleId; deletes every other user plus all students,
+                               # sessions, registrations, teaching logs and legacy events.
 npm run seed-resources         # load teaching resources + embeddings for RAG (needs OPENAI_API_KEY)
-npm run create-test-data       # create-test-volunteers + create-test-students
+npm run create-test-data       # create-test-volunteers + create-test-students (older, unrealistic)
 npm run create-test-volunteers
 npm run create-test-students
-npm run clear-data             # wipe collections
+npm run clear-data             # wipe collections - WARNING: deletes ALL users, including the
+                               # club's real Google accounts. Prefer seed-club-data.
 npm run list-users
 npm run manage-roles           # interactive role editor
 npm run change-role            # quick single-user role change

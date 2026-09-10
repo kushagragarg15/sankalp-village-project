@@ -1,5 +1,6 @@
 const Student = require('../models/Student');
 const TeachingLog = require('../models/TeachingLog');
+const AttendanceSession = require('../models/AttendanceSession');
 
 // @desc    Get all students
 // @route   GET /api/students
@@ -47,12 +48,7 @@ exports.getStudent = async (req, res, next) => {
 // @access  Private
 exports.getStudentProgress = async (req, res, next) => {
   try {
-    const student = await Student.findById(req.params.id)
-      .populate({
-        path: 'attendance',
-        select: 'title date sessions',
-        options: { sort: { date: -1 } }
-      });
+    const student = await Student.findById(req.params.id).lean();
 
     if (!student) {
       return res.status(404).json({
@@ -61,30 +57,35 @@ exports.getStudentProgress = async (req, res, next) => {
       });
     }
 
-    // Get total events
-    const Event = require('../models/Event');
-    const totalEvents = await Event.countDocuments({ status: 'completed' });
+    // Progress is derived from TeachingLog, the system that is actually
+    // written to today. It used to read `student.attendance` and `Event`,
+    // which only the legacy check-in flow ever populated — so this page showed
+    // zero sessions and no topics no matter how much teaching was recorded.
+    const [logs, totalSessions] = await Promise.all([
+      TeachingLog.find({ studentId: student._id })
+        .populate('sessionId', 'title startTime')
+        .populate('volunteerId', 'name')
+        .sort({ timestamp: -1 })
+        .lean(),
+      AttendanceSession.countDocuments({ endTime: { $lte: new Date() } })
+    ]);
 
-    // Calculate attendance percentage
-    const attendancePercentage = totalEvents > 0 
-      ? Math.round((student.attendance.length / totalEvents) * 100)
-      : 0;
+    // One session may hold several lessons for the same child.
+    const sessionsAttended = new Set(
+      logs.map((log) => String(log.sessionId?._id || log.sessionId))
+    ).size;
 
-    // Group topics by subject from events
-    const topicsBySubject = {};
-    for (const event of student.attendance) {
-      if (event.sessions) {
-        event.sessions.forEach(session => {
-          if (!topicsBySubject[session.subject]) {
-            topicsBySubject[session.subject] = [];
-          }
-          topicsBySubject[session.subject].push({
-            topic: session.topicCovered,
-            date: event.date
-          });
-        });
-      }
+    const topicsCovered = {};
+    for (const log of logs) {
+      (topicsCovered[log.subject] = topicsCovered[log.subject] || []).push({
+        topic: log.topic,
+        date: log.timestamp,
+        volunteer: log.volunteerId?.name
+      });
     }
+
+    const percentage =
+      totalSessions > 0 ? Math.round((sessionsAttended / totalSessions) * 100) : 0;
 
     res.status(200).json({
       success: true,
@@ -96,13 +97,17 @@ exports.getStudentProgress = async (req, res, next) => {
           enrollmentDate: student.enrollmentDate
         },
         attendance: {
-          eventsAttended: student.attendance.length,
-          totalEvents,
-          percentage: attendancePercentage
+          eventsAttended: sessionsAttended,
+          totalEvents: totalSessions,
+          percentage
         },
-        topicsCovered: topicsBySubject,
-        quizScores: student.quizScores,
-        recentEvents: student.attendance.slice(0, 5)
+        topicsCovered,
+        quizScores: student.quizScores || [],
+        recentSessions: [...new Map(
+          logs
+            .filter((log) => log.sessionId)
+            .map((log) => [String(log.sessionId._id), log.sessionId])
+        ).values()].slice(0, 5)
       }
     });
   } catch (error) {
@@ -157,7 +162,40 @@ exports.updateStudent = async (req, res, next) => {
 // @access  Private
 exports.addQuizScore = async (req, res, next) => {
   try {
-    const { subject, topic, score, maxScore } = req.body;
+    const { subject, topic } = req.body;
+    const score = Number(req.body.score);
+    const maxScore = Number(req.body.maxScore);
+
+    // None of this was checked before, so a quiz could be stored out of 0 —
+    // which the UI then divided by, showing Infinity — or with a score higher
+    // than the total.
+    if (!subject || !topic) {
+      return res.status(400).json({
+        success: false,
+        message: 'Subject and topic are required'
+      });
+    }
+
+    if (!Number.isFinite(score) || !Number.isFinite(maxScore)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Score and total must be numbers'
+      });
+    }
+
+    if (maxScore <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'The total must be greater than zero'
+      });
+    }
+
+    if (score < 0 || score > maxScore) {
+      return res.status(400).json({
+        success: false,
+        message: `Score must be between 0 and ${maxScore}`
+      });
+    }
 
     const student = await Student.findById(req.params.id);
 
