@@ -1,5 +1,5 @@
 const Student = require('../models/Student');
-const Session = require('../models/Session');
+const TeachingLog = require('../models/TeachingLog');
 
 // @desc    Get all students
 // @route   GET /api/students

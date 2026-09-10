@@ -1,9 +1,11 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// With no VITE_API_URL we stay same-origin and let the Vite dev proxy (and any
+// production rewrite) forward /api — that avoids the CORS preflight entirely.
+const API_URL = import.meta.env.VITE_API_URL;
 
 const api = axios.create({
-  baseURL: `${API_URL}/api`,
+  baseURL: API_URL ? `${API_URL}/api` : '/api',
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json'

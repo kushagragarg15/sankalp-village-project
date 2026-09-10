@@ -10,7 +10,7 @@ import Spine, { SpineEntry } from '../components/Spine';
 import Badge from '../components/Badge';
 import { attendanceSessionAPI } from '../utils/api';
 import { useToast } from '../context/ToastContext';
-import useLiveSessions from '../utils/useLiveSessions';
+import { useSessions } from '../context/SessionsContext';
 import { formatDay, formatTime, relativeToNow, sessionState } from '../utils/session';
 
 // A session is named for the day it runs, so it reads the same in the app
@@ -26,7 +26,7 @@ const titleForDate = (date) => {
 const SESSION_HOURS = 3;
 
 export default function AdminSessions() {
-  const { sessions, loading, error, refresh } = useLiveSessions();
+  const { sessions, loading, error, refresh } = useSessions();
   const toast = useToast();
   const [openDialog, setOpenDialog] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(null);

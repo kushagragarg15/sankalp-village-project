@@ -1,5 +1,8 @@
 const AttendanceSession = require('../models/AttendanceSession');
 
+// How long an issued code stays valid.
+const CODE_TTL_MS = 10 * 60 * 1000;
+
 // Generate random 5-character code
 const generateRandomCode = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -66,7 +69,7 @@ exports.generateCode = async (req, res, next) => {
 
     // Generate new code
     const code = generateRandomCode();
-    const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
+    const expiry = new Date(Date.now() + CODE_TTL_MS);
 
     session.activeCode = code;
     session.codeExpiry = expiry;
@@ -91,24 +94,48 @@ exports.getAllSessions = async (req, res, next) => {
   try {
     const sessions = await AttendanceSession.find()
       .populate('createdBy', 'name email')
-      .sort({ startTime: -1 });
+      .sort({ startTime: -1 })
+      .lean();
 
     const now = new Date();
 
-    // Auto-generate codes for active sessions that don't have a valid code
-    for (const session of sessions) {
+    // Rotate codes for any running session whose code has lapsed.
+    //
+    // The client polls this endpoint, so this ran on every poll. It used to
+    // `await session.save()` one session at a time inside the loop, adding a
+    // serial round trip per session even though the writes are independent.
+    // Now the whole rotation is a single bulkWrite, and sessions that already
+    // hold a valid code cost nothing at all.
+    const stale = sessions.filter((session) => {
       const isActive = now >= session.startTime && now <= session.endTime;
-      const hasValidCode = session.activeCode && session.codeExpiry && now < session.codeExpiry;
+      const hasValidCode =
+        session.activeCode && session.codeExpiry && now < session.codeExpiry;
+      return isActive && !hasValidCode;
+    });
 
-      if (isActive && !hasValidCode) {
-        // Generate new code
-        const code = generateRandomCode();
-        const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
+    if (stale.length > 0) {
+      const expiry = new Date(Date.now() + CODE_TTL_MS);
 
-        session.activeCode = code;
-        session.codeExpiry = expiry;
-        await session.save();
-      }
+      await AttendanceSession.bulkWrite(
+        stale.map((session) => {
+          // Mutate the copy we are about to send so the response carries the
+          // fresh code without re-reading it.
+          session.activeCode = generateRandomCode();
+          session.codeExpiry = expiry;
+
+          return {
+            updateOne: {
+              filter: { _id: session._id },
+              update: {
+                $set: {
+                  activeCode: session.activeCode,
+                  codeExpiry: expiry
+                }
+              }
+            }
+          };
+        })
+      );
     }
 
     res.status(200).json({
@@ -127,7 +154,8 @@ exports.getAllSessions = async (req, res, next) => {
 exports.getSession = async (req, res, next) => {
   try {
     const session = await AttendanceSession.findById(req.params.id)
-      .populate('createdBy', 'name email');
+      .populate('createdBy', 'name email')
+      .lean();
 
     if (!session) {
       return res.status(404).json({

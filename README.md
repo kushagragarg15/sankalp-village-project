@@ -81,11 +81,11 @@ npm install
 4. **Seed the database**
 ```bash
 cd server
-npm run seed
-npm run seed-resources  # Seeds teaching resources for RAG
+npm run create-test-data   # Creates test volunteer accounts and students
+npm run seed-resources     # Seeds teaching resources + embeddings for RAG (needs OPENAI_API_KEY)
 ```
 
-This creates sample data including admin and volunteer accounts, students, sessions, and teaching resources.
+This creates 15 test volunteer accounts and 15 students. Attendance sessions are created from the app (admin UI), and no admin account is seeded — see **Demo Credentials** below for how to get admin access.
 
 5. **Start the application**
 
@@ -105,13 +105,14 @@ npm run dev
 
 ## Demo Credentials
 
-**Admin Account**
-- Email: admin@sankalpvillage.org
-- Password: admin123
+**Volunteer Accounts** (created by `npm run create-test-data`)
+- Email: `rahul.volunteer@gmail.com` (plus 14 more `<firstname>.volunteer@gmail.com` accounts)
+- Password: `volunteer123` (all accounts)
 
-**Volunteer Account**
-- Email: priya@sankalpvillage.org
-- Password: volunteer123
+**Admin access**
+No admin account is seeded. Either:
+- Sign in with Google using an email that starts with `23` or `24` (auto-assigned `admin`), or
+- Promote an existing user: `cd server && npm run change-role <email> admin`
 
 ## Project Structure
 

@@ -1,22 +1,29 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { SessionsProvider } from './context/SessionsContext';
 import LoadingState from './components/LoadingState';
+
+// Login and the two screens a volunteer reaches first stay in the main bundle;
+// everything else is split out so the first paint does not carry recharts, the
+// QR scanner, and every admin screen along with it.
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
-import Students from './pages/Students';
-import StudentProgress from './pages/StudentProgress';
-import CheckIn from './pages/CheckIn';
-import LogSession from './pages/LogSession';
-import MyAttendance from './pages/MyAttendance';
-import MyAttendanceNew from './pages/MyAttendanceNew';
-import Volunteers from './pages/Volunteers';
-import Analytics from './pages/Analytics';
-import AITeachingNotes from './pages/AITeachingNotes';
-import AdminSessions from './pages/AdminSessions';
 import VolunteerSessions from './pages/VolunteerSessions';
 import AttendancePage from './pages/AttendancePage';
-import AttendanceReport from './pages/AttendanceReport';
+
+const Students = lazy(() => import('./pages/Students'));
+const StudentProgress = lazy(() => import('./pages/StudentProgress'));
+const CheckIn = lazy(() => import('./pages/CheckIn'));
+const LogSession = lazy(() => import('./pages/LogSession'));
+const MyAttendance = lazy(() => import('./pages/MyAttendance'));
+const MyAttendanceNew = lazy(() => import('./pages/MyAttendanceNew'));
+const Volunteers = lazy(() => import('./pages/Volunteers'));
+const Analytics = lazy(() => import('./pages/Analytics'));
+const AITeachingNotes = lazy(() => import('./pages/AITeachingNotes'));
+const AdminSessions = lazy(() => import('./pages/AdminSessions'));
+const AttendanceReport = lazy(() => import('./pages/AttendanceReport'));
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user, loading } = useAuth();
@@ -57,22 +64,32 @@ function App() {
     <Router>
       <AuthProvider>
         <ToastProvider>
-          <Routes>
-            <Route path="/login" element={<Login />} />
+          <SessionsProvider>
+            <Suspense
+              fallback={
+                <div className="min-h-screen bg-paper flex items-center justify-center">
+                  <LoadingState label="Loading" />
+                </div>
+              }
+            >
+              <Routes>
+                <Route path="/login" element={<Login />} />
 
-            {routes.map(({ path, element, adminOnly }) => (
-              <Route
-                key={path}
-                path={path}
-                element={
-                  <ProtectedRoute adminOnly={adminOnly}>{element}</ProtectedRoute>
-                }
-              />
-            ))}
+                {routes.map(({ path, element, adminOnly }) => (
+                  <Route
+                    key={path}
+                    path={path}
+                    element={
+                      <ProtectedRoute adminOnly={adminOnly}>{element}</ProtectedRoute>
+                    }
+                  />
+                ))}
 
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              </Routes>
+            </Suspense>
+          </SessionsProvider>
         </ToastProvider>
       </AuthProvider>
     </Router>

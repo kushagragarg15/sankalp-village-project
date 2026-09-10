@@ -90,7 +90,8 @@ eventSchema.pre('save', function(next) {
 
 // Index for efficient queries
 eventSchema.index({ date: -1 });
-eventSchema.index({ qrCode: 1 });
+// qrCode is already indexed by `unique: true` on the field; declaring it again
+// built a second, redundant index that every write had to maintain.
 eventSchema.index({ status: 1 });
 
 module.exports = mongoose.model('Event', eventSchema);

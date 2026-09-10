@@ -7,7 +7,7 @@ import LiveCode from '../components/LiveCode';
 import Button from '../components/Button';
 import Badge from '../components/Badge';
 import Spine, { SpineEntry } from '../components/Spine';
-import useLiveSessions from '../utils/useLiveSessions';
+import { useSessions } from '../context/SessionsContext';
 import {
   formatDay,
   formatDayLong,
@@ -19,7 +19,7 @@ import {
 export default function Dashboard() {
   const { isAdmin, user } = useAuth();
   const navigate = useNavigate();
-  const { sessions, live, loading, error, refresh } = useLiveSessions();
+  const { sessions, live, loading, error, refresh } = useSessions();
 
   const upcoming = sessions
     .filter((s) => sessionState(s) === 'upcoming')

@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
-import useLiveSessions from '../utils/useLiveSessions';
+import { useSessions } from '../context/SessionsContext';
 
 export default function Layout({ children }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
-  const { live } = useLiveSessions(60000);
+  const { live } = useSessions();
 
   const closeDrawer = () => setDrawerOpen(false);
 

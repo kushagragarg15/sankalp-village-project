@@ -9,13 +9,13 @@ import Badge from '../components/Badge';
 import SessionRow from '../components/SessionRow';
 import { registrationAPI } from '../utils/api';
 import { useToast } from '../context/ToastContext';
-import useLiveSessions from '../utils/useLiveSessions';
+import { useSessions } from '../context/SessionsContext';
 import { sessionState } from '../utils/session';
 
 export default function VolunteerSessions() {
   const navigate = useNavigate();
   const toast = useToast();
-  const { sessions, loading, error, refresh } = useLiveSessions();
+  const { sessions, loading, error, refresh } = useSessions();
   const [registrations, setRegistrations] = useState([]);
   const [registering, setRegistering] = useState(null);
 

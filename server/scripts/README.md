@@ -92,12 +92,9 @@ Create test volunteer accounts with passwords for easy testing.
 npm run create-test-volunteers
 ```
 
-**Creates 5 test accounts:**
-- volunteer1@gmail.com
-- volunteer2@gmail.com
-- volunteer3@gmail.com
-- john.volunteer@gmail.com
-- jane.volunteer@gmail.com
+**Creates 15 test accounts:**
+- `rahul.volunteer@gmail.com`, `priya.volunteer@gmail.com`, `amit.volunteer@gmail.com`, ...
+- All follow the pattern `<firstname>.volunteer@gmail.com` (see `createTestVolunteers.js` for the full list)
 
 **Password for all:** `volunteer123`
 
@@ -122,15 +119,15 @@ Create dummy student data for testing the attendance system.
 npm run create-test-students
 ```
 
-**Creates 26 test students:**
-- Grade 1: 3 students
-- Grade 2: 3 students
-- Grade 3: 4 students
-- Grade 4: 3 students
-- Grade 5: 4 students
-- Grade 6: 3 students
-- Grade 7: 3 students
-- Grade 8: 3 students
+**Creates 15 test students:**
+- Grade 1: 2 students
+- Grade 2: 2 students
+- Grade 3: 3 students
+- Grade 4: 2 students
+- Grade 5: 2 students
+- Grade 6: 2 students
+- Grade 7: 1 student
+- Grade 8: 1 student
 
 **Output:**
 ```
@@ -138,7 +135,7 @@ npm run create-test-students
 ✅ Created: Diya Sharma (Grade 1)
 ...
 📊 Summary:
-   Created: 26 students
+   Created: 15 students
 ```
 
 **Note:** If students already exist, they will be skipped.

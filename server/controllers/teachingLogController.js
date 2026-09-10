@@ -50,8 +50,13 @@ exports.submitTeachingLog = async (req, res, next) => {
       }
     }
 
-    // 1. Validate session exists
-    const session = await AttendanceSession.findById(session_id);
+    // 1 + 3. The session and the volunteer's registration do not depend on each
+    // other, so fetch them in parallel instead of paying two serial round trips.
+    const [session, registration] = await Promise.all([
+      AttendanceSession.findById(session_id).lean(),
+      Registration.findOne({ userId: req.user.id, sessionId: session_id }).lean()
+    ]);
+
     if (!session) {
       return res.status(404).json({
         success: false,
@@ -67,12 +72,6 @@ exports.submitTeachingLog = async (req, res, next) => {
         message: 'Session is not currently active'
       });
     }
-
-    // 3. Validate registration
-    const registration = await Registration.findOne({
-      userId: req.user.id,
-      sessionId: session_id
-    });
 
     if (!registration) {
       return res.status(403).json({
@@ -117,36 +116,46 @@ exports.submitTeachingLog = async (req, res, next) => {
       }
     }
 
-    // 6. Check for duplicates and insert logs
-    const createdLogs = [];
-    const duplicates = [];
+    // 6. Insert every entry in one unordered batch.
+    //
+    // This used to be a findOne + create per student: 2 serial round trips each,
+    // so a volunteer logging ten children paid twenty. The unique index on
+    // (sessionId, volunteerId, studentId) is what actually enforces no
+    // double-logging, so we let it do that job and read the duplicates back off
+    // the write errors instead of pre-checking for them.
+    const docs = entries.map((entry) => ({
+      volunteerId: req.user.id,
+      sessionId: session_id,
+      studentId: entry.student_id,
+      subject: entry.subject,
+      topic: entry.topic,
+      codeUsed: code,
+      lat: lat || null,
+      lng: lng || null
+    }));
 
-    for (const entry of entries) {
-      // Check if log already exists
-      const existingLog = await TeachingLog.findOne({
-        volunteerId: req.user.id,
-        sessionId: session_id,
-        studentId: entry.student_id
-      });
+    let createdLogs = [];
+    let duplicates = [];
 
-      if (existingLog) {
-        duplicates.push(entry.student_id);
-        continue;
+    try {
+      createdLogs = await TeachingLog.insertMany(docs, { ordered: false });
+    } catch (error) {
+      // With ordered:false Mongo inserts everything it can and reports the rest.
+      if (error.writeErrors || error.code === 11000) {
+        const writeErrors = error.writeErrors || [];
+        duplicates = writeErrors
+          .filter((e) => (e.err?.code || e.code) === 11000)
+          .map((e) => docs[e.index ?? e.err?.index]?.studentId)
+          .filter(Boolean);
+
+        // Anything that was not a duplicate is a real failure.
+        const other = writeErrors.filter((e) => (e.err?.code || e.code) !== 11000);
+        if (other.length > 0) throw error;
+
+        createdLogs = error.insertedDocs || [];
+      } else {
+        throw error;
       }
-
-      // Create teaching log
-      const log = await TeachingLog.create({
-        volunteerId: req.user.id,
-        sessionId: session_id,
-        studentId: entry.student_id,
-        subject: entry.subject,
-        topic: entry.topic,
-        codeUsed: code,
-        lat: lat || null,
-        lng: lng || null
-      });
-
-      createdLogs.push(log);
     }
 
     res.status(201).json({
@@ -171,7 +180,8 @@ exports.getMyLogs = async (req, res, next) => {
     const logs = await TeachingLog.find({ volunteerId: req.user.id })
       .populate('sessionId', 'title startTime endTime')
       .populate('studentId', 'name grade')
-      .sort({ timestamp: -1 });
+      .sort({ timestamp: -1 })
+      .lean();
 
     res.status(200).json({
       success: true,
@@ -191,7 +201,8 @@ exports.getSessionLogs = async (req, res, next) => {
     const logs = await TeachingLog.find({ sessionId: req.params.sessionId })
       .populate('volunteerId', 'name email')
       .populate('studentId', 'name grade')
-      .sort({ timestamp: -1 });
+      .sort({ timestamp: -1 })
+      .lean();
 
     res.status(200).json({
       success: true,
@@ -213,7 +224,8 @@ exports.getAllLogs = async (req, res, next) => {
       .populate('sessionId', 'title startTime endTime')
       .populate('studentId', 'name grade')
       .sort({ timestamp: -1 })
-      .limit(100); // Limit for performance
+      .limit(100) // Limit for performance
+      .lean();
 
     res.status(200).json({
       success: true,

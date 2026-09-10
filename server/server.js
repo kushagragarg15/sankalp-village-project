@@ -21,9 +21,13 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // Enable CORS
+// Every request carries an Authorization header, which makes it a "non-simple"
+// cross-origin request: without a Max-Age the browser re-sends an OPTIONS
+// preflight every few seconds, doubling the round trips for the whole API.
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
-  credentials: true
+  credentials: true,
+  maxAge: 86400
 }));
 
 // Mount routers

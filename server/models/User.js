@@ -54,6 +54,9 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// The volunteer leaderboard and roster both filter on role.
+userSchema.index({ role: 1 });
+
 // Hash password before saving
 userSchema.pre('save', async function(next) {
   // Only hash password if it exists and is modified

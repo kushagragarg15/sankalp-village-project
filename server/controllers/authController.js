@@ -95,11 +95,11 @@ exports.logout = async (req, res, next) => {
 // @access  Private
 exports.getMe = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.id);
-
+    // `protect` already loaded the projected user, so re-querying here only
+    // bought a second round trip and the unbounded `attendance` array.
     res.status(200).json({
       success: true,
-      data: user
+      data: req.user
     });
   } catch (error) {
     next(error);
