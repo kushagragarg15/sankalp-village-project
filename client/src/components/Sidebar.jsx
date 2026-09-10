@@ -1,220 +1,110 @@
-import { Link, useLocation } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LayoutDashboard, Users, GraduationCap, BarChart2, FileText, ClipboardCheck } from 'lucide-react';
 import logoImage from '../assets/sankalp-logo.jpg';
 
-export default function Sidebar({ onNavigate }) {
-  const location = useLocation();
+// Named for what a volunteer or coordinator would call them, not for the
+// tables underneath.
+const adminLinks = [
+  { path: '/dashboard', label: 'Today' },
+  { path: '/admin-sessions', label: 'Sessions' },
+  { path: '/attendance-report', label: 'Attendance' },
+  { path: '/volunteers', label: 'Volunteers' },
+  { path: '/students', label: 'Students' },
+  { path: '/analytics', label: 'Insights' },
+  { path: '/ai-notes', label: 'Lesson planner' },
+];
+
+const volunteerLinks = [
+  { path: '/dashboard', label: 'Today' },
+  { path: '/volunteer-sessions', label: 'Sessions' },
+  { path: '/my-attendance-new', label: 'My record' },
+  { path: '/students', label: 'Students' },
+  { path: '/analytics', label: 'Insights' },
+  { path: '/ai-notes', label: 'Lesson planner' },
+];
+
+export default function Sidebar({ onNavigate, liveCount = 0 }) {
   const { user, isAdmin, logout } = useAuth();
-
-  const isActive = (path) => location.pathname === path;
-
-  const adminLinks = [
-    { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/admin-sessions', label: 'Manage Sessions', icon: ClipboardCheck },
-    { path: '/attendance-report', label: 'Attendance Report', icon: FileText },
-    { path: '/volunteers', label: 'Volunteers', icon: Users },
-    { path: '/students', label: 'Students', icon: GraduationCap },
-    { path: '/analytics', label: 'Analytics', icon: BarChart2 },
-    { path: '/ai-notes', label: 'AI Notes', icon: FileText }
-  ];
-
-  const volunteerLinks = [
-    { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/volunteer-sessions', label: 'Attendance Sessions', icon: ClipboardCheck },
-    { path: '/my-attendance-new', label: 'My Attendance', icon: BarChart2 },
-    { path: '/students', label: 'Students', icon: GraduationCap },
-    { path: '/analytics', label: 'Analytics', icon: BarChart2 },
-    { path: '/ai-notes', label: 'AI Notes', icon: FileText }
-  ];
-
   const links = isAdmin ? adminLinks : volunteerLinks;
 
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
-        
-        .mobile-close-btn {
-          -webkit-tap-highlight-color: transparent;
-          touch-action: manipulation;
-        }
-        
-        .mobile-close-btn:hover {
-          background-color: rgba(255, 255, 255, 0.1) !important;
-          border-radius: 4px;
-        }
-        
-        .mobile-close-btn:active {
-          background-color: rgba(255, 255, 255, 0.2) !important;
-        }
-        
-        @media (min-width: 769px) {
-          .mobile-close-btn {
-            display: none !important;
-          }
-        }
-      `}</style>
-      
-      <div style={{
-        width: '220px',
-        backgroundColor: '#111111',
-        height: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif'
-      }}>
-        {/* Logo */}
-        <div style={{ 
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '10px',
-          padding: '20px 16px 16px 16px',
-          borderBottom: '1px solid #1f1f1f'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <img 
-              src={logoImage}
-              alt="Sankalp Logo"
-              style={{
-                height: '28px',
-                width: 'auto',
-                objectFit: 'contain'
-              }}
-            />
-            <div>
-              <h1 style={{ 
-                fontSize: '15px', 
-                fontWeight: '600', 
-                color: '#ffffff',
-                marginBottom: '2px',
-                lineHeight: '1'
-              }}>
-                Sankalp
-              </h1>
-              <p style={{ 
-                fontSize: '11px', 
-                color: '#666666',
-                lineHeight: '1'
-              }}>
-                Rural Education
-              </p>
-            </div>
+    <div className="flex h-full w-full flex-col bg-board text-paper">
+      <div className="flex items-center justify-between gap-3 px-5 h-16 border-b border-board-600">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <img
+            src={logoImage}
+            alt=""
+            className="h-8 w-8 rounded object-cover shrink-0"
+          />
+          <div className="min-w-0">
+            <p className="type-title text-[15px] text-paper truncate">Sankalp Club</p>
+            <p className="text-[12px] text-board-400 truncate">Teaching register</p>
           </div>
-          
-          {/* Close button for mobile */}
-          <button
-            onClick={onNavigate}
-            type="button"
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#ffffff',
-              cursor: 'pointer',
-              padding: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '28px',
-              lineHeight: '1',
-              minWidth: '40px',
-              minHeight: '40px',
-              WebkitTapHighlightColor: 'transparent',
-              userSelect: 'none'
-            }}
-            className="mobile-close-btn"
-            aria-label="Close menu"
-          >
-            ×
-          </button>
         </div>
+        <button
+          type="button"
+          onClick={onNavigate}
+          aria-label="Close menu"
+          className="md:hidden -mr-2 h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-md text-board-400 hover:text-paper hover:bg-board-600 transition-colors"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+      </div>
 
-        {/* Navigation */}
-        <nav style={{ flex: 1, padding: '16px 0', overflowY: 'auto' }}>
-          {links.map((link) => {
-            const Icon = link.icon;
-            const active = isActive(link.path);
-            
-            return (
-              <Link
-                key={link.path}
+      <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Main">
+        <ul className="space-y-0.5">
+          {links.map((link) => (
+            <li key={link.path}>
+              <NavLink
                 to={link.path}
                 onClick={onNavigate}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '10px 20px',
-                  fontSize: '14px',
-                  color: active ? '#ffffff' : '#777777',
-                  textDecoration: 'none',
-                  backgroundColor: active ? '#1f1f1f' : 'transparent',
-                  borderLeft: active ? '2px solid #ffffff' : '2px solid transparent',
-                  transition: 'all 120ms ease'
-                }}
-                onMouseEnter={(e) => {
-                  if (!active) {
-                    e.currentTarget.style.backgroundColor = '#1a1a1a';
-                    e.currentTarget.style.color = '#cccccc';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!active) {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = '#777777';
-                  }
-                }}
+                className={({ isActive }) =>
+                  `flex items-center justify-between gap-2 rounded-md px-3 h-10 text-sm transition-colors ${
+                    isActive
+                      ? 'bg-board-600 text-paper font-medium'
+                      : 'text-board-400 hover:text-paper hover:bg-board-700'
+                  }`
+                }
               >
-                <Icon size={16} style={{ marginRight: '12px' }} />
-                {link.label}
-              </Link>
-            );
-          })}
-        </nav>
+                {({ isActive }) => (
+                  <>
+                    <span className="flex items-center gap-2.5 min-w-0">
+                      <span
+                        aria-hidden="true"
+                        className={`h-4 w-px shrink-0 ${
+                          isActive ? 'bg-gold-bright' : 'bg-transparent'
+                        }`}
+                      />
+                      <span className="truncate">{link.label}</span>
+                    </span>
+                    {link.path === '/dashboard' && liveCount > 0 && (
+                      <span className="shrink-0 rounded bg-gold-bright px-1.5 text-[11px] font-semibold text-board tabular-nums">
+                        {liveCount}
+                      </span>
+                    )}
+                  </>
+                )}
+              </NavLink>
+            </li>
+          ))}
+        </ul>
+      </nav>
 
-        {/* User info */}
-        <div style={{ 
-          padding: '20px', 
-          borderTop: '1px solid #2a2a2a'
-        }}>
-          <p style={{ 
-            fontSize: '13px', 
-            fontWeight: '500', 
-            color: '#ffffff',
-            marginBottom: '2px'
-          }}>
-            {user?.name}
-          </p>
-          <p style={{ 
-            fontSize: '11px', 
-            color: '#666666',
-            marginBottom: '12px'
-          }}>
-            {user?.email}
-          </p>
-          <button
-            onClick={logout}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              fontSize: '13px',
-              color: '#666666',
-              cursor: 'pointer',
-              fontFamily: 'Inter, sans-serif',
-              textDecoration: 'none'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.textDecoration = 'underline';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.textDecoration = 'none';
-            }}
-          >
-            Logout
-          </button>
-        </div>
+      <div className="border-t border-board-600 px-5 py-4">
+        <p className="text-sm font-medium text-paper truncate">{user?.name}</p>
+        <p className="text-[12px] text-board-400 truncate">
+          {isAdmin ? 'Coordinator' : 'Volunteer'}
+        </p>
+        <button
+          type="button"
+          onClick={logout}
+          className="mt-3 text-[13px] text-board-400 hover:text-paper underline underline-offset-4 decoration-board-500 hover:decoration-paper transition-colors"
+        >
+          Sign out
+        </button>
       </div>
-    </>
+    </div>
   );
 }

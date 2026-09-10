@@ -1,146 +1,156 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
+import LoadingState from '../components/LoadingState';
+import Button from '../components/Button';
+import EmptyState from '../components/EmptyState';
 import { attendanceSessionAPI, getStudents, teachingLogAPI } from '../utils/api';
+import { useToast } from '../context/ToastContext';
+import { formatTime, sessionState } from '../utils/session';
 
+/**
+ * The field screen. A volunteer is standing in a classroom on a phone with a
+ * code that expires, so this page is one column, thumb-sized, and ordered the
+ * way the task actually happens: code, then who you taught, then submit.
+ */
 export default function AttendancePage() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
+  const toast = useToast();
 
   const [session, setSession] = useState(null);
   const [students, setStudents] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedStudents, setSelectedStudents] = useState({});
+  const [search, setSearch] = useState('');
+  const [picked, setPicked] = useState({});
   const [code, setCode] = useState('');
   const [location, setLocation] = useState(null);
+  const [locationDenied, setLocationDenied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [alreadySubmitted, setAlreadySubmitted] = useState(false);
 
   useEffect(() => {
-    fetchData();
-    getLocation();
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const [sessionRes, studentsRes] = await Promise.all([
+          attendanceSessionAPI.getOne(sessionId),
+          getStudents(),
+        ]);
+        if (cancelled) return;
+        setSession(sessionRes.data.data);
+        setStudents(studentsRes.data.data || []);
+      } catch (err) {
+        if (!cancelled) setError('This session could not be loaded.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [sessionId]);
 
-  const fetchData = async () => {
-    try {
-      const [sessionRes, studentsRes] = await Promise.all([
-        attendanceSessionAPI.getOne(sessionId),
-        getStudents()
-      ]);
-
-      setSession(sessionRes.data.data);
-      setStudents(studentsRes.data.data);
-      setAlreadySubmitted(false); // Disable duplicate check for now
-    } catch (error) {
-      setError('Failed to load data');
-      console.error('Error fetching data:', error);
-    } finally {
-      setLoading(false);
+  const requestLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationDenied(true);
+      return;
     }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+        setLocationDenied(false);
+      },
+      () => setLocationDenied(true),
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   };
 
-  const getLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-        },
-        (error) => {
-          console.error('Error getting location:', error);
-          // Location is optional, so we don't show error
-        }
-      );
-    }
-  };
+  useEffect(requestLocation, []);
 
-  const toggleStudent = (studentId) => {
-    setSelectedStudents(prev => {
-      const newSelected = { ...prev };
-      if (newSelected[studentId]) {
-        delete newSelected[studentId];
+  const toggle = (studentId) => {
+    setPicked((current) => {
+      const next = { ...current };
+      if (next[studentId]) {
+        delete next[studentId];
       } else {
-        newSelected[studentId] = {
-          student_id: studentId,
-          subject: '',
-          topic: ''
-        };
+        next[studentId] = { student_id: studentId, subject: '', topic: '' };
       }
-      return newSelected;
+      return next;
     });
   };
 
-  const updateStudentData = (studentId, field, value) => {
-    setSelectedStudents(prev => ({
-      ...prev,
-      [studentId]: {
-        ...prev[studentId],
-        [field]: value
-      }
+  const update = (studentId, field, value) => {
+    setPicked((current) => ({
+      ...current,
+      [studentId]: { ...current[studentId], [field]: value },
     }));
   };
+
+  const entries = Object.values(picked);
+
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return students;
+    return students.filter(
+      (s) =>
+        s.name.toLowerCase().includes(term) ||
+        String(s.grade).toLowerCase().includes(term)
+    );
+  }, [students, search]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    // Validation
-    const entries = Object.values(selectedStudents);
+    if (code.trim().length < 5) {
+      setError('Enter the five-character code your coordinator read out.');
+      return;
+    }
     if (entries.length === 0) {
-      setError('Please select at least one student');
+      setError('Pick at least one student you taught.');
       return;
     }
-
-    if (!code.trim()) {
-      setError('Attendance code is required');
+    const incomplete = entries.find((entry) => !entry.subject.trim() || !entry.topic.trim());
+    if (incomplete) {
+      setError('Every student you picked needs a subject and a topic.');
       return;
     }
-
-    // Check all entries have subject and topic
-    for (const entry of entries) {
-      if (!entry.subject.trim() || !entry.topic.trim()) {
-        setError('All selected students must have subject and topic filled');
-        return;
-      }
+    if (!location) {
+      setError('Attendance is recorded on site, so location access is required.');
+      return;
     }
 
     setSubmitting(true);
-
     try {
-      const payload = {
+      const response = await teachingLogAPI.submit({
         session_id: sessionId,
         entries,
         code: code.trim().toUpperCase(),
-        lat: location?.lat || null,
-        lng: location?.lng || null
-      };
-
-      const response = await teachingLogAPI.submit(payload);
-
-      alert(response.data.message);
+        lat: location.lat,
+        lng: location.lng,
+      });
+      toast.done(response.data.message || 'Attendance recorded.');
       navigate('/volunteer-sessions');
-    } catch (error) {
-      setError(error.response?.data?.message || 'Failed to submit attendance');
+    } catch (err) {
+      setError(
+        err.response?.data?.message ||
+          'Attendance was not recorded. Check the code and try again.'
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
-  const filteredStudents = students.filter(student =>
-    student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    student.grade.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-64">
-          <p className="text-zinc-500">Loading...</p>
-        </div>
+        <LoadingState label="Opening the session" />
       </Layout>
     );
   }
@@ -148,218 +158,230 @@ export default function AttendancePage() {
   if (!session) {
     return (
       <Layout>
-        <div className="text-center py-12">
-          <p className="text-red-600">Session not found</p>
-        </div>
+        <EmptyState
+          title="Session not found"
+          description="It may have been deleted. Go back and pick a session from the list."
+          action={
+            <Button onClick={() => navigate('/volunteer-sessions')}>
+              Back to sessions
+            </Button>
+          }
+        />
       </Layout>
     );
   }
 
-  if (alreadySubmitted) {
+  const state = sessionState(session);
+
+  if (state !== 'live') {
     return (
       <Layout>
-        <div className="w-full max-w-7xl mx-auto">
-          <div className="mb-6">
-            <button
-              onClick={() => navigate('/volunteer-sessions')}
-              className="text-sm text-[#6b6b6b] hover:text-[#111111] mb-4"
-            >
-              ← Back to Sessions
-            </button>
-          </div>
-          <div className="bg-[#f0fdf4] border border-[#bbf7d0] rounded-lg p-8 text-center">
-            <div className="text-5xl mb-4">✓</div>
-            <h2 className="text-xl font-semibold text-[#15803d] mb-2">
-              Attendance Already Submitted
-            </h2>
-            <p className="text-[#6b6b6b] mb-6">
-              You have already submitted attendance for this session.
-            </p>
-            <button
-              onClick={() => navigate('/volunteer-sessions')}
-              className="h-11 px-6 bg-[#15803d] text-white text-sm font-medium rounded-md hover:bg-[#166534] transition-colors"
-            >
-              Back to Sessions
-            </button>
-          </div>
-        </div>
+        <EmptyState
+          title={state === 'upcoming' ? 'This session has not started' : 'This session has closed'}
+          description={
+            state === 'upcoming'
+              ? `It opens at ${formatTime(session.startTime)}. Attendance can only be recorded while it is running.`
+              : `It closed at ${formatTime(session.endTime)}. Ask your coordinator to open a new session if a lesson still needs recording.`
+          }
+          action={
+            <Button onClick={() => navigate('/volunteer-sessions')}>
+              Back to sessions
+            </Button>
+          }
+        />
       </Layout>
     );
   }
 
   return (
     <Layout>
-      <div className="w-full max-w-7xl mx-auto">
-        <div className="mb-6">
-          <button
-            onClick={() => navigate('/volunteer-sessions')}
-            className="text-sm text-[#6b6b6b] hover:text-[#111111] mb-4"
-          >
-            ← Back to Sessions
-          </button>
-          <h1 className="text-xl sm:text-2xl font-semibold text-[#111111] mb-2">
-            Submit Attendance
-          </h1>
-          <p className="text-sm text-[#6b6b6b]">{session.title}</p>
+      <button
+        type="button"
+        onClick={() => navigate('/volunteer-sessions')}
+        className="mb-4 text-[13px] text-ink-2 underline underline-offset-4 hover:text-ink"
+      >
+        Back to sessions
+      </button>
+
+      <div className="mb-6">
+        <div className="flex items-center gap-2">
+          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-gold animate-rule-pulse" />
+          <span className="text-[13px] font-medium text-gold-deep">Live now</span>
+          <span className="text-[13px] text-ink-2">closes {formatTime(session.endTime)}</span>
         </div>
+        <h1 className="type-display mt-2 text-[26px] sm:text-[32px] text-ink">
+          Record attendance
+        </h1>
+        <p className="mt-1 text-sm text-ink-2">{session.title}</p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="pb-28 md:pb-0">
+        {/* The gate. */}
+        <section className="mb-8">
+          <label htmlFor="code" className="block type-title text-[15px] text-ink">
+            Session code
+          </label>
+          <p className="mt-1 text-[13px] text-ink-2">
+            Five characters, read out by your coordinator. It changes every ten minutes.
+          </p>
+          <input
+            id="code"
+            value={code}
+            onChange={(e) => {
+              setCode(e.target.value.toUpperCase().slice(0, 5));
+              setError('');
+            }}
+            maxLength={5}
+            autoComplete="off"
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck="false"
+            placeholder="—————"
+            aria-describedby="code-help"
+            className="mt-3 w-full sm:w-[13ch] h-16 rounded-lg border border-rule-strong bg-surface px-4 text-center font-mono text-[28px] font-bold uppercase tracking-code text-ink placeholder:text-rule-strong outline-none transition-colors focus:border-gold focus:ring-1 focus:ring-gold"
+          />
+          <p id="code-help" className="sr-only">
+            Enter the five character attendance code
+          </p>
+        </section>
+
+        {/* Location: a quiet ruled line, not a coloured slab. */}
+        <section className="mb-8 flex flex-wrap items-center justify-between gap-2 border-y border-rule py-3">
+          <div className="flex items-center gap-2.5">
+            <span
+              aria-hidden="true"
+              className={`h-2 w-2 rounded-full ${location ? 'bg-teal' : 'bg-brick'}`}
+            />
+            <span className="text-sm text-ink">
+              {location ? 'You are on site' : 'Location needed'}
+            </span>
+            {location && (
+              <span className="font-mono text-[12px] text-ink-3">
+                {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
+              </span>
+            )}
+          </div>
+          {!location && (
+            <button
+              type="button"
+              onClick={requestLocation}
+              className="text-[13px] text-ink underline underline-offset-4"
+            >
+              {locationDenied ? 'Try again' : 'Share location'}
+            </button>
+          )}
+        </section>
+
+        <section className="mb-8">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="type-title text-[15px] text-ink">Who did you teach?</h2>
+            <span className="text-[13px] text-ink-2 tabular-nums">
+              {entries.length} selected
+            </span>
+          </div>
+
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name or class"
+            aria-label="Search students"
+            className="mt-3 w-full h-11 rounded-md border border-rule-strong bg-surface px-3 text-[15px] text-ink placeholder:text-ink-3 outline-none transition-colors focus:border-board focus:ring-1 focus:ring-board"
+          />
+
+          {filtered.length === 0 ? (
+            <p className="mt-6 text-sm text-ink-2">
+              No student matches “{search}”. Check the spelling, or clear the search.
+            </p>
+          ) : (
+            <ul className="mt-3 divide-y divide-rule border-y border-rule">
+              {filtered.map((student) => {
+                const selected = !!picked[student._id];
+                return (
+                  <li key={student._id} className={selected ? 'bg-gold-wash' : ''}>
+                    <label className="flex cursor-pointer items-center gap-3 px-1 py-3.5">
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => toggle(student._id)}
+                        className="h-5 w-5 shrink-0 accent-[#17211F] cursor-pointer"
+                      />
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-sm font-medium text-ink truncate">
+                          {student.name}
+                        </span>
+                        <span className="block text-[13px] text-ink-2">{student.grade}</span>
+                      </span>
+                    </label>
+
+                    {selected && (
+                      <div className="grid grid-cols-1 gap-3 px-1 pb-4 sm:grid-cols-2 sm:pl-9">
+                        <div>
+                          <label
+                            htmlFor={`subject-${student._id}`}
+                            className="block text-[13px] text-ink-2 mb-1"
+                          >
+                            Subject
+                          </label>
+                          <input
+                            id={`subject-${student._id}`}
+                            value={picked[student._id].subject}
+                            onChange={(e) => update(student._id, 'subject', e.target.value)}
+                            placeholder="Maths"
+                            className="w-full h-11 rounded-md border border-rule-strong bg-surface px-3 text-[15px] text-ink placeholder:text-ink-3 outline-none focus:border-board focus:ring-1 focus:ring-board"
+                          />
+                        </div>
+                        <div>
+                          <label
+                            htmlFor={`topic-${student._id}`}
+                            className="block text-[13px] text-ink-2 mb-1"
+                          >
+                            Topic
+                          </label>
+                          <input
+                            id={`topic-${student._id}`}
+                            value={picked[student._id].topic}
+                            onChange={(e) => update(student._id, 'topic', e.target.value)}
+                            placeholder="Fractions"
+                            className="w-full h-11 rounded-md border border-rule-strong bg-surface px-3 text-[15px] text-ink placeholder:text-ink-3 outline-none focus:border-board focus:ring-1 focus:ring-board"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <p className="text-sm text-red-600">{error}</p>
+          <div
+            role="alert"
+            className="mb-4 rounded-md border border-brick-line bg-brick-wash px-4 py-3 md:mb-6"
+          >
+            <p className="text-sm text-brick">{error}</p>
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
-          {/* Attendance Code */}
-          <div className="bg-white border border-[#e4e4e4] rounded-lg p-4 sm:p-6 mb-6">
-            <label className="block text-sm font-medium text-[#111111] mb-2">
-              Attendance Code *
-            </label>
-            <input
-              type="text"
-              value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="Enter 5-character code"
-              maxLength={5}
-              className="w-full sm:w-64 h-11 px-4 text-sm border border-[#e4e4e4] rounded-md focus:outline-none focus:border-[#111111]"
-              required
-            />
-            <p className="text-xs text-[#9a9a9a] mt-2">
-              Get the code from your session coordinator
-            </p>
-          </div>
-
-          {/* Student Selection */}
-          <div className="bg-white border border-[#e4e4e4] rounded-lg p-4 sm:p-6 mb-6">
-            <h2 className="text-base font-semibold text-[#111111] mb-4">
-              Select Students ({Object.keys(selectedStudents).length} selected)
-            </h2>
-
-            {/* Search */}
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search students by name or grade..."
-              className="w-full h-11 px-4 text-sm border border-[#e4e4e4] rounded-md focus:outline-none focus:border-[#111111] mb-4"
-            />
-
-            {/* Students List */}
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {filteredStudents.map((student) => {
-                const isSelected = !!selectedStudents[student._id];
-
-                return (
-                  <div
-                    key={student._id}
-                    className={`border rounded-lg p-4 transition-all ${
-                      isSelected
-                        ? 'border-[#111111] bg-[#fafafa]'
-                        : 'border-[#e4e4e4] hover:border-[#6b6b6b]'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleStudent(student._id)}
-                        className="mt-1 w-4 h-4 cursor-pointer"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <p className="font-medium text-sm text-[#111111]">
-                            {student.name}
-                          </p>
-                          <span className="text-xs text-[#6b6b6b]">
-                            {student.grade}
-                          </span>
-                        </div>
-
-                        {isSelected && (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                            <div>
-                              <label className="block text-xs text-[#6b6b6b] mb-1">
-                                Subject *
-                              </label>
-                              <input
-                                type="text"
-                                value={selectedStudents[student._id].subject}
-                                onChange={(e) =>
-                                  updateStudentData(student._id, 'subject', e.target.value)
-                                }
-                                placeholder="e.g., Math"
-                                className="w-full h-9 px-3 text-sm border border-[#e4e4e4] rounded-md focus:outline-none focus:border-[#111111]"
-                                required
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs text-[#6b6b6b] mb-1">
-                                Topic *
-                              </label>
-                              <input
-                                type="text"
-                                value={selectedStudents[student._id].topic}
-                                onChange={(e) =>
-                                  updateStudentData(student._id, 'topic', e.target.value)
-                                }
-                                placeholder="e.g., Algebra"
-                                className="w-full h-9 px-3 text-sm border border-[#e4e4e4] rounded-md focus:outline-none focus:border-[#111111]"
-                                required
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {filteredStudents.length === 0 && (
-              <p className="text-center text-[#6b6b6b] text-sm py-8">
-                No students found
-              </p>
-            )}
-          </div>
-
-          {/* Location Status */}
-          {location ? (
-            <div className="bg-[#f0faf2] border border-[#c6e8cc] rounded-lg p-4 mb-6">
-              <p className="text-sm text-[#3a7d44]">
-                ✓ Location captured: {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
-              </p>
-              <p className="text-xs text-[#6b6b6b] mt-1">
-                You must be within 1km of the school to submit (testing mode)
-              </p>
-            </div>
-          ) : (
-            <div className="bg-[#fff7ed] border border-[#fed7aa] rounded-lg p-4 mb-6">
-              <p className="text-sm text-[#c2410c]">
-                ⚠ Location not available - enable location services to submit attendance
-              </p>
-            </div>
-          )}
-
-          {/* Submit Button */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            <button
-              type="button"
-              onClick={() => navigate('/volunteer-sessions')}
-              className="h-11 px-6 bg-white border border-[#e4e4e4] text-[#111111] text-sm font-medium rounded-md hover:bg-[#fafafa] transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting || Object.keys(selectedStudents).length === 0 || !location}
-              className="h-11 px-6 bg-[#111111] text-white text-sm font-medium rounded-md hover:bg-[#2a2a2a] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {submitting ? 'Submitting...' : 'Submit Attendance'}
-            </button>
-          </div>
-        </form>
-      </div>
+        {/* Thumb-reachable on a phone, inline on a laptop. */}
+        <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-3 border-t border-rule bg-surface px-4 py-3 md:static md:border-0 md:bg-transparent md:px-0 md:py-0">
+          <span className="flex-1 text-[13px] text-ink-2 tabular-nums md:hidden">
+            {entries.length} {entries.length === 1 ? 'student' : 'students'}
+          </span>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => navigate('/volunteer-sessions')}
+            className="hidden md:inline-flex"
+          >
+            Cancel
+          </Button>
+          <Button type="submit" variant="live" size="lg" disabled={submitting}>
+            {submitting ? 'Recording' : 'Record attendance'}
+          </Button>
+        </div>
+      </form>
     </Layout>
   );
 }

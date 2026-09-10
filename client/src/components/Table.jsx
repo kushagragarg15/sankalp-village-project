@@ -1,7 +1,10 @@
-export default function Table({ children, className = '' }) {
+export default function Table({ children, minWidth = 640, className = '' }) {
   return (
     <div className="overflow-x-auto">
-      <table className={`min-w-full divide-y divide-zinc-200 ${className}`}>
+      <table
+        className={`w-full text-left border-collapse ${className}`}
+        style={{ minWidth }}
+      >
         {children}
       </table>
     </div>
@@ -9,24 +12,19 @@ export default function Table({ children, className = '' }) {
 }
 
 export function TableHead({ children }) {
-  return (
-    <thead className="bg-zinc-50">
-      {children}
-    </thead>
-  );
+  return <thead className="bg-paper">{children}</thead>;
 }
 
 export function TableBody({ children }) {
-  return (
-    <tbody className="bg-white divide-y divide-zinc-200">
-      {children}
-    </tbody>
-  );
+  return <tbody>{children}</tbody>;
 }
 
 export function TableRow({ children, className = '', ...props }) {
   return (
-    <tr className={`hover:bg-zinc-50 transition-colors duration-150 ${className}`} {...props}>
+    <tr
+      className={`border-t border-rule hover:bg-paper transition-colors duration-100 ${className}`}
+      {...props}
+    >
       {children}
     </tr>
   );
@@ -36,7 +34,7 @@ export function TableHeader({ children, className = '' }) {
   return (
     <th
       scope="col"
-      className={`px-3 sm:px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider ${className}`}
+      className={`px-4 py-2.5 text-[13px] font-medium text-ink-2 whitespace-nowrap ${className}`}
     >
       {children}
     </th>
@@ -45,7 +43,7 @@ export function TableHeader({ children, className = '' }) {
 
 export function TableCell({ children, className = '' }) {
   return (
-    <td className={`px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-zinc-900 ${className}`}>
+    <td className={`px-4 py-3 text-sm text-ink align-middle ${className}`}>
       {children}
     </td>
   );

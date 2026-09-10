@@ -1,136 +1,116 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { volunteerAttendanceAPI } from '../utils/api';
 import Layout from '../components/Layout';
+import PageHeader from '../components/PageHeader';
+import LoadingState from '../components/LoadingState';
+import EmptyState from '../components/EmptyState';
+import StatStrip from '../components/StatStrip';
+import Spine, { SpineEntry } from '../components/Spine';
+import { useToast } from '../context/ToastContext';
+import { formatDay, formatTime } from '../utils/session';
 
 export default function MyAttendanceNew() {
   const [attendance, setAttendance] = useState(null);
   const [loading, setLoading] = useState(true);
+  const toast = useToast();
 
   useEffect(() => {
-    fetchAttendance();
+    (async () => {
+      try {
+        const response = await volunteerAttendanceAPI.getMyAttendance();
+        setAttendance(response.data.data);
+      } catch {
+        toast.blocked('Your record could not be loaded.');
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
-
-  const fetchAttendance = async () => {
-    try {
-      const response = await volunteerAttendanceAPI.getMyAttendance();
-      setAttendance(response.data.data);
-    } catch (error) {
-      console.error('Error fetching attendance:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const formatDate = (date) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
 
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-64">
-          <p className="text-zinc-500">Loading attendance...</p>
-        </div>
+        <LoadingState label="Loading your record" />
       </Layout>
     );
   }
 
+  const history = attendance?.attendanceHistory || [];
+  const studentsTaught = new Set(
+    history.flatMap((record) => record.students.map((s) => s.name))
+  ).size;
+
   return (
     <Layout>
-      <div className="w-full max-w-7xl mx-auto">
-        <h1 className="text-xl sm:text-2xl font-semibold text-[#111111] mb-4 sm:mb-6">
-          My Attendance
-        </h1>
+      <PageHeader
+        title="My record"
+        lede="Every session you have taught, and what you covered with each child."
+      />
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          <div className="bg-white border border-[#e4e4e4] rounded-lg p-4 sm:p-6">
-            <p className="text-xs sm:text-sm text-[#6b6b6b] mb-1">My Rank</p>
-            <p className="text-2xl sm:text-3xl font-bold text-[#111111]">
-              #{attendance?.rank || '-'}
-            </p>
-            <p className="text-xs text-[#9a9a9a] mt-1">
-              out of {attendance?.totalVolunteers || 0} volunteers
-            </p>
-          </div>
-          <div className="bg-white border border-[#e4e4e4] rounded-lg p-4 sm:p-6">
-            <p className="text-xs sm:text-sm text-[#6b6b6b] mb-1">Sessions Attended</p>
-            <p className="text-2xl sm:text-3xl font-bold text-[#111111]">
-              {attendance?.totalSessions || 0}
-            </p>
-          </div>
-          <div className="bg-white border border-[#e4e4e4] rounded-lg p-4 sm:p-6">
-            <p className="text-xs sm:text-sm text-[#6b6b6b] mb-1">Status</p>
-            <span className="inline-flex items-center px-3 py-1 rounded text-sm font-medium bg-[#f0faf2] text-[#3a7d44] border border-[#c6e8cc]">
-              Active
-            </span>
-          </div>
-        </div>
+      <StatStrip
+        className="mb-8 lg:grid-cols-3"
+        items={[
+          {
+            label: 'Sessions taught',
+            value: attendance?.totalSessions ?? 0,
+          },
+          {
+            label: 'Rank',
+            value: attendance?.rank ? `${attendance.rank}` : '—',
+            note: attendance?.totalVolunteers
+              ? `of ${attendance.totalVolunteers} volunteers`
+              : undefined,
+          },
+          {
+            label: 'Children taught',
+            value: studentsTaught,
+            note: 'distinct students',
+          },
+        ]}
+      />
 
-        {/* Attendance History */}
-        <div className="bg-white border border-[#e4e4e4] rounded-lg p-4 sm:p-6">
-          <h2 className="text-base sm:text-lg font-semibold text-[#111111] mb-4">
-            Attendance History
-          </h2>
+      <h2 className="type-title mb-4 text-[15px] text-ink">Sessions</h2>
 
-          {!attendance?.attendanceHistory || attendance.attendanceHistory.length === 0 ? (
-            <p className="text-sm text-[#6b6b6b] text-center py-8">
-              No attendance records yet
-            </p>
-          ) : (
-            <div className="space-y-4">
-              {attendance.attendanceHistory.map((record, index) => (
-                <div
-                  key={index}
-                  className="border border-[#e4e4e4] rounded-lg p-4 hover:shadow-sm transition-shadow"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-3">
-                    <div>
-                      <h3 className="text-sm font-semibold text-[#111111]">
-                        {record.session.title}
-                      </h3>
-                      <p className="text-xs text-[#6b6b6b] mt-1">
-                        {formatDate(record.session.startTime)}
-                      </p>
-                    </div>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#f0faf2] text-[#3a7d44] border border-[#c6e8cc] self-start">
-                      Attended
+      {history.length === 0 ? (
+        <EmptyState
+          title="Nothing recorded yet"
+          description="Register for a session, teach, and record what you covered while you are at the school. It will show up here."
+        />
+      ) : (
+        <Spine>
+          {history.map((record, index) => (
+            <SpineEntry key={index} state="done">
+              <p className="text-sm font-medium text-ink">{record.session.title}</p>
+              <p className="text-[13px] text-ink-2">
+                {formatDay(record.session.startTime)}, {formatTime(record.session.startTime)}
+                <span className="text-ink-3">
+                  {' · '}
+                  {record.students.length}{' '}
+                  {record.students.length === 1 ? 'child' : 'children'}
+                </span>
+              </p>
+
+              <ul className="mt-3 divide-y divide-rule rounded-lg border border-rule bg-surface">
+                {record.students.map((student, idx) => (
+                  <li
+                    key={idx}
+                    className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 px-3.5 py-2.5"
+                  >
+                    <span className="text-sm text-ink">
+                      {student.name}{' '}
+                      <span className="text-ink-3">{student.grade}</span>
                     </span>
-                  </div>
-
-                  <div className="border-t border-[#f0f0f0] pt-3">
-                    <p className="text-xs text-[#9a9a9a] mb-2">
-                      Students Taught ({record.students.length}):
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {record.students.map((student, idx) => (
-                        <div
-                          key={idx}
-                          className="bg-[#fafafa] rounded px-3 py-2 text-xs"
-                        >
-                          <p className="font-medium text-[#111111]">
-                            {student.name} ({student.grade})
-                          </p>
-                          <p className="text-[#6b6b6b] mt-1">
-                            {student.subject} - {student.topic}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+                    <span className="text-[13px] text-ink-2">
+                      {student.subject}
+                      {student.topic ? `, ${student.topic}` : ''}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </SpineEntry>
+          ))}
+        </Spine>
+      )}
     </Layout>
   );
 }

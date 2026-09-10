@@ -1,297 +1,235 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Layout from '../components/Layout';
-import Card, { CardBody, CardHeader, CardTitle } from '../components/Card';
+import PageHeader from '../components/PageHeader';
+import LoadingState from '../components/LoadingState';
+import EmptyState from '../components/EmptyState';
+import StatStrip from '../components/StatStrip';
 import Button from '../components/Button';
 import { Select } from '../components/Input';
+import Table, {
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../components/Table';
 import api from '../utils/api';
+import { useToast } from '../context/ToastContext';
+import { formatDayLong, formatStamp, formatTime } from '../utils/session';
 
 export default function AttendanceReport() {
   const [sessions, setSessions] = useState([]);
-  const [selectedSession, setSelectedSession] = useState('');
-  const [attendanceData, setAttendanceData] = useState([]);
+  const [selected, setSelected] = useState('');
+  const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [stats, setStats] = useState(null);
+  const toast = useToast();
 
   useEffect(() => {
-    fetchSessions();
+    (async () => {
+      try {
+        const response = await api.get('/attendance-sessions');
+        setSessions(response.data.data || []);
+      } catch {
+        toast.blocked('Sessions could not be loaded.');
+      }
+    })();
   }, []);
 
   useEffect(() => {
-    if (selectedSession) {
-      fetchAttendanceData();
-    }
-  }, [selectedSession]);
-
-  const fetchSessions = async () => {
-    try {
-      const response = await api.get('/attendance-sessions');
-      setSessions(response.data.data);
-    } catch (error) {
-      console.error('Error fetching sessions:', error);
-    }
-  };
-
-  const fetchAttendanceData = async () => {
-    setLoading(true);
-    try {
-      const response = await api.get(`/teaching-logs/session/${selectedSession}`);
-      const logs = response.data.data;
-      setAttendanceData(logs);
-      calculateStats(logs);
-    } catch (error) {
-      console.error('Error fetching attendance:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const calculateStats = (logs) => {
-    const uniqueStudents = new Set(logs.map(log => log.studentId._id));
-    const uniqueVolunteers = new Set(logs.map(log => log.volunteerId._id));
-    const subjects = {};
-
-    logs.forEach(log => {
-      subjects[log.subject] = (subjects[log.subject] || 0) + 1;
-    });
-
-    setStats({
-      totalEntries: logs.length,
-      uniqueStudents: uniqueStudents.size,
-      uniqueVolunteers: uniqueVolunteers.size,
-      subjects
-    });
-  };
-
-  const downloadCSV = () => {
-    if (attendanceData.length === 0) {
-      alert('No data to download');
+    if (!selected) {
+      setLogs([]);
       return;
     }
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      try {
+        const response = await api.get(`/teaching-logs/session/${selected}`);
+        if (!cancelled) setLogs(response.data.data || []);
+      } catch {
+        if (!cancelled) {
+          setLogs([]);
+          toast.blocked('That session report could not be loaded.');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selected]);
 
-    // Get session info
-    const session = sessions.find(s => s._id === selectedSession);
-    const sessionDate = new Date(session.startTime).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }).replace(/\//g, '-');
+  const session = sessions.find((s) => s._id === selected);
 
-    // Prepare CSV headers
+  const stats = useMemo(() => {
+    if (logs.length === 0) return null;
+    return {
+      entries: logs.length,
+      students: new Set(logs.map((l) => l.studentId?._id)).size,
+      volunteers: new Set(logs.map((l) => l.volunteerId?._id)).size,
+      subjects: new Set(logs.map((l) => l.subject)).size,
+    };
+  }, [logs]);
+
+  const byDate = useMemo(() => {
+    return logs.reduce((acc, log) => {
+      const key = formatDayLong(log.timestamp);
+      (acc[key] = acc[key] || []).push(log);
+      return acc;
+    }, {});
+  }, [logs]);
+
+  const downloadCSV = () => {
+    if (logs.length === 0 || !session) return;
+
     const headers = [
       'Date',
-      'Session Name',
-      'Student Name',
-      'Grade',
-      'Volunteer Name',
-      'Volunteer Email',
+      'Session',
+      'Student',
+      'Class',
+      'Volunteer',
+      'Volunteer email',
       'Subject',
       'Topic',
       'Time',
-      'Location (Lat)',
-      'Location (Lng)'
+      'Latitude',
+      'Longitude',
     ];
 
-    // Prepare CSV rows
-    const rows = attendanceData.map(log => [
-      new Date(log.timestamp).toLocaleDateString('en-US'),
+    const escape = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+
+    const rows = logs.map((log) => [
+      new Date(log.timestamp).toLocaleDateString('en-IN'),
       session.title,
-      log.studentId.name,
-      log.studentId.grade,
-      log.volunteerId.name,
-      log.volunteerId.email,
+      log.studentId?.name,
+      log.studentId?.grade,
+      log.volunteerId?.name,
+      log.volunteerId?.email,
       log.subject,
       log.topic,
-      new Date(log.timestamp).toLocaleTimeString('en-US'),
-      log.lat || 'N/A',
-      log.lng || 'N/A'
+      new Date(log.timestamp).toLocaleTimeString('en-IN'),
+      log.lat ?? '',
+      log.lng ?? '',
     ]);
 
-    // Create CSV content
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-    ].join('\n');
-
-    // Create blob and download
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
+    const csv = [headers, ...rows].map((row) => row.map(escape).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    
-    link.setAttribute('href', url);
-    link.setAttribute('download', `attendance_${session.title.replace(/\s+/g, '_')}_${sessionDate}.csv`);
-    link.style.visibility = 'hidden';
-    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `sankalp-attendance-${session.title.replace(/\s+/g, '-')}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.done('CSV downloaded.');
   };
-
-  const formatDateTime = (date) => {
-    return new Date(date).toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  // Group attendance by date
-  const groupedByDate = attendanceData.reduce((acc, log) => {
-    const date = new Date(log.timestamp).toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-    
-    if (!acc[date]) {
-      acc[date] = [];
-    }
-    acc[date].push(log);
-    return acc;
-  }, {});
 
   return (
     <Layout>
-      <div className="max-w-7xl">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-semibold text-zinc-900">
-            Attendance Report
-          </h1>
-          {attendanceData.length > 0 && (
-            <Button onClick={downloadCSV}>
-              📥 Download CSV
+      <PageHeader
+        title="Attendance"
+        lede="Everything volunteers recorded in a session: who taught which child, what was covered, and when."
+        actions={
+          logs.length > 0 && (
+            <Button variant="secondary" onClick={downloadCSV}>
+              Download CSV
             </Button>
-          )}
-        </div>
+          )
+        }
+      />
 
-        {/* Session Selector */}
-        <Card className="mb-6">
-          <CardBody>
-            <Select
-              label="Select Session"
-              value={selectedSession}
-              onChange={(e) => setSelectedSession(e.target.value)}
-            >
-              <option value="">-- Choose a session --</option>
-              {sessions.map(session => (
-                <option key={session._id} value={session._id}>
-                  {session.title} - {formatDateTime(session.startTime)}
-                </option>
-              ))}
-            </Select>
-          </CardBody>
-        </Card>
-
-        {loading && (
-          <div className="flex items-center justify-center h-64">
-            <p className="text-zinc-500">Loading attendance data...</p>
-          </div>
-        )}
-
-        {!loading && selectedSession && attendanceData.length === 0 && (
-          <Card>
-            <CardBody>
-              <p className="text-zinc-500 text-center py-8">
-                No attendance records found for this session
-              </p>
-            </CardBody>
-          </Card>
-        )}
-
-        {!loading && stats && (
-          <>
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <Card>
-                <CardBody>
-                  <p className="text-sm text-zinc-500 mb-1">Total Entries</p>
-                  <p className="text-3xl font-semibold text-zinc-900">
-                    {stats.totalEntries}
-                  </p>
-                </CardBody>
-              </Card>
-
-              <Card>
-                <CardBody>
-                  <p className="text-sm text-zinc-500 mb-1">Students</p>
-                  <p className="text-3xl font-semibold text-zinc-900">
-                    {stats.uniqueStudents}
-                  </p>
-                </CardBody>
-              </Card>
-
-              <Card>
-                <CardBody>
-                  <p className="text-sm text-zinc-500 mb-1">Volunteers</p>
-                  <p className="text-3xl font-semibold text-zinc-900">
-                    {stats.uniqueVolunteers}
-                  </p>
-                </CardBody>
-              </Card>
-
-              <Card>
-                <CardBody>
-                  <p className="text-sm text-zinc-500 mb-1">Subjects</p>
-                  <p className="text-3xl font-semibold text-zinc-900">
-                    {Object.keys(stats.subjects).length}
-                  </p>
-                </CardBody>
-              </Card>
-            </div>
-
-            {/* Date-wise Attendance */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Date-wise Attendance</CardTitle>
-              </CardHeader>
-              <CardBody>
-                <div className="space-y-6">
-                  {Object.entries(groupedByDate).map(([date, logs]) => (
-                    <div key={date}>
-                      <h3 className="font-semibold text-zinc-900 mb-3 pb-2 border-b border-zinc-200">
-                        {date} ({logs.length} entries)
-                      </h3>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b border-zinc-200">
-                              <th className="text-left py-2 px-3 text-zinc-600 font-medium">Time</th>
-                              <th className="text-left py-2 px-3 text-zinc-600 font-medium">Student</th>
-                              <th className="text-left py-2 px-3 text-zinc-600 font-medium">Grade</th>
-                              <th className="text-left py-2 px-3 text-zinc-600 font-medium">Volunteer</th>
-                              <th className="text-left py-2 px-3 text-zinc-600 font-medium">Subject</th>
-                              <th className="text-left py-2 px-3 text-zinc-600 font-medium">Topic</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {logs.map((log, index) => (
-                              <tr key={index} className="border-b border-zinc-100 hover:bg-zinc-50">
-                                <td className="py-2 px-3 text-zinc-900">
-                                  {new Date(log.timestamp).toLocaleTimeString('en-US', {
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })}
-                                </td>
-                                <td className="py-2 px-3 text-zinc-900">{log.studentId.name}</td>
-                                <td className="py-2 px-3 text-zinc-600">{log.studentId.grade}</td>
-                                <td className="py-2 px-3 text-zinc-900">{log.volunteerId.name}</td>
-                                <td className="py-2 px-3 text-zinc-900">{log.subject}</td>
-                                <td className="py-2 px-3 text-zinc-600">{log.topic}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardBody>
-            </Card>
-          </>
-        )}
+      <div className="mb-8 sm:max-w-md">
+        <Select
+          label="Session"
+          value={selected}
+          onChange={(e) => setSelected(e.target.value)}
+        >
+          <option value="">Choose a session</option>
+          {sessions.map((s) => (
+            <option key={s._id} value={s._id}>
+              {s.title} — {formatStamp(s.startTime)}
+            </option>
+          ))}
+        </Select>
       </div>
+
+      {!selected && (
+        <EmptyState
+          title="Pick a session"
+          description="Choose one above to see every lesson recorded against it."
+        />
+      )}
+
+      {loading && <LoadingState label="Loading the report" />}
+
+      {!loading && selected && logs.length === 0 && (
+        <EmptyState
+          title="Nothing was recorded"
+          description="No volunteer submitted attendance for this session. If that looks wrong, check the session ran inside its window and that volunteers were registered."
+        />
+      )}
+
+      {!loading && stats && (
+        <>
+          <StatStrip
+            className="mb-8"
+            items={[
+              { label: 'Lessons recorded', value: stats.entries },
+              { label: 'Children taught', value: stats.students },
+              { label: 'Volunteers', value: stats.volunteers },
+              { label: 'Subjects', value: stats.subjects },
+            ]}
+          />
+
+          <div className="space-y-8">
+            {Object.entries(byDate).map(([date, dayLogs]) => (
+              <section key={date}>
+                <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2 border-b border-rule pb-2">
+                  <h2 className="type-title text-[15px] text-ink">{date}</h2>
+                  <span className="text-[13px] text-ink-2 tabular-nums">
+                    {dayLogs.length} {dayLogs.length === 1 ? 'lesson' : 'lessons'}
+                  </span>
+                </div>
+
+                <div className="rounded-lg border border-rule bg-surface overflow-hidden">
+                  <Table minWidth={720}>
+                    <TableHead>
+                      <tr>
+                        <TableHeader className="w-20">Time</TableHeader>
+                        <TableHeader>Student</TableHeader>
+                        <TableHeader>Class</TableHeader>
+                        <TableHeader>Volunteer</TableHeader>
+                        <TableHeader>Subject</TableHeader>
+                        <TableHeader>Topic</TableHeader>
+                      </tr>
+                    </TableHead>
+                    <TableBody>
+                      {dayLogs.map((log, index) => (
+                        <TableRow key={index}>
+                          <TableCell className="font-mono text-[13px] text-ink-2 tabular-nums">
+                            {formatTime(log.timestamp)}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {log.studentId?.name}
+                          </TableCell>
+                          <TableCell className="text-ink-2">
+                            {log.studentId?.grade}
+                          </TableCell>
+                          <TableCell>{log.volunteerId?.name}</TableCell>
+                          <TableCell>{log.subject}</TableCell>
+                          <TableCell className="text-ink-2">{log.topic}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </section>
+            ))}
+          </div>
+        </>
+      )}
     </Layout>
   );
 }

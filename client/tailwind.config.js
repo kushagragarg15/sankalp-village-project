@@ -7,25 +7,82 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['Archivo', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       colors: {
-        primary: {
-          50: '#eef2ff',
-          100: '#e0e7ff',
-          200: '#c7d2fe',
-          300: '#a5b4fc',
-          400: '#818cf8',
-          500: '#6366f1',
-          600: '#4f46e5',
-          700: '#4338ca',
-          800: '#3730a3',
-          900: '#312e81',
-        }
+        // The blackboard. Only the nav rail and the live module are inverted.
+        board: {
+          DEFAULT: '#17211F',
+          700: '#1E2B28',
+          600: '#2A3A35',
+          500: '#3E524C',
+          400: '#5C716A',
+        },
+        // Chalk-grey ground.
+        paper: {
+          DEFAULT: '#F1F2EE',
+          deep: '#E6E8E2',
+        },
+        surface: '#FFFFFF',
+        rule: {
+          DEFAULT: '#DCDFD8',
+          strong: '#C5CAC2',
+        },
+        ink: {
+          DEFAULT: '#17211F',
+          2: '#56605C',
+          3: '#79837E',
+        },
+        // Club gold — live state only.
+        gold: {
+          DEFAULT: '#B8791B',
+          deep: '#8A5A0F',
+          bright: '#E9A83A',
+          wash: '#FBF2E0',
+          line: '#E8D3A6',
+        },
+        teal: {
+          DEFAULT: '#1E6B5E',
+          wash: '#E7F0ED',
+          line: '#BCD5CE',
+        },
+        brick: {
+          DEFAULT: '#A32C24',
+          wash: '#FAEBE9',
+          line: '#EACBC7',
+        },
       },
-      transitionDuration: {
-        '150': '150ms',
-      }
+      borderRadius: {
+        sm: '3px',
+        DEFAULT: '5px',
+        md: '6px',
+        lg: '8px',
+        xl: '12px',
+      },
+      letterSpacing: {
+        display: '-0.02em',
+        code: '0.16em',
+      },
+      keyframes: {
+        'rule-pulse': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.45' },
+        },
+        'drawer-in': {
+          from: { transform: 'translateX(-100%)' },
+          to: { transform: 'translateX(0)' },
+        },
+        'lift-in': {
+          from: { opacity: '0', transform: 'translateY(6px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
+      animation: {
+        'rule-pulse': 'rule-pulse 1.6s ease-in-out infinite',
+        'drawer-in': 'drawer-in 200ms cubic-bezier(0.32, 0.72, 0, 1)',
+        'lift-in': 'lift-in 160ms ease-out',
+      },
     },
   },
   plugins: [],

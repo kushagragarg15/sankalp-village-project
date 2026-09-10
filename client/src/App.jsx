@@ -1,5 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
+import LoadingState from './components/LoadingState';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Students from './pages/Students';
@@ -16,164 +18,62 @@ import VolunteerSessions from './pages/VolunteerSessions';
 import AttendancePage from './pages/AttendancePage';
 import AttendanceReport from './pages/AttendanceReport';
 
-// Protected route wrapper
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user, loading } = useAuth();
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-50 flex items-center justify-center">
-        <p className="text-zinc-500">Loading...</p>
+      <div className="min-h-screen bg-paper flex items-center justify-center">
+        <LoadingState label="Signing you in" />
       </div>
     );
   }
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (adminOnly && user.role !== 'admin') {
-    return <Navigate to="/dashboard" replace />;
-  }
+  if (!user) return <Navigate to="/login" replace />;
+  if (adminOnly && user.role !== 'admin') return <Navigate to="/dashboard" replace />;
 
   return children;
 }
+
+const routes = [
+  { path: '/dashboard', element: <Dashboard /> },
+  { path: '/checkin', element: <CheckIn /> },
+  { path: '/log-session', element: <LogSession /> },
+  { path: '/my-attendance', element: <MyAttendance /> },
+  { path: '/my-attendance-new', element: <MyAttendanceNew /> },
+  { path: '/students', element: <Students /> },
+  { path: '/students/:id', element: <StudentProgress /> },
+  { path: '/volunteers', element: <Volunteers />, adminOnly: true },
+  { path: '/analytics', element: <Analytics /> },
+  { path: '/ai-notes', element: <AITeachingNotes /> },
+  { path: '/admin-sessions', element: <AdminSessions />, adminOnly: true },
+  { path: '/volunteer-sessions', element: <VolunteerSessions /> },
+  { path: '/attendance/:sessionId', element: <AttendancePage /> },
+  { path: '/attendance-report', element: <AttendanceReport />, adminOnly: true },
+];
 
 function App() {
   return (
     <Router>
       <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/checkin"
-            element={
-              <ProtectedRoute>
-                <CheckIn />
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/log-session"
-            element={
-              <ProtectedRoute>
-                <LogSession />
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/my-attendance"
-            element={
-              <ProtectedRoute>
-                <MyAttendance />
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/my-attendance-new"
-            element={
-              <ProtectedRoute>
-                <MyAttendanceNew />
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/students"
-            element={
-              <ProtectedRoute>
-                <Students />
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/students/:id"
-            element={
-              <ProtectedRoute>
-                <StudentProgress />
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/volunteers"
-            element={
-              <ProtectedRoute adminOnly>
-                <Volunteers />
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/analytics"
-            element={
-              <ProtectedRoute>
-                <Analytics />
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/ai-notes"
-            element={
-              <ProtectedRoute>
-                <AITeachingNotes />
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/admin-sessions"
-            element={
-              <ProtectedRoute adminOnly>
-                <AdminSessions />
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/volunteer-sessions"
-            element={
-              <ProtectedRoute>
-                <VolunteerSessions />
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/attendance/:sessionId"
-            element={
-              <ProtectedRoute>
-                <AttendancePage />
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/attendance-report"
-            element={
-              <ProtectedRoute adminOnly>
-                <AttendanceReport />
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
+        <ToastProvider>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+
+            {routes.map(({ path, element, adminOnly }) => (
+              <Route
+                key={path}
+                path={path}
+                element={
+                  <ProtectedRoute adminOnly={adminOnly}>{element}</ProtectedRoute>
+                }
+              />
+            ))}
+
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </ToastProvider>
       </AuthProvider>
     </Router>
   );

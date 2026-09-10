@@ -1,55 +1,108 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
-export default function Modal({ isOpen, onClose, title, children, size = 'md' }) {
+const sizes = {
+  sm: 'sm:max-w-md',
+  md: 'sm:max-w-xl',
+  lg: 'sm:max-w-3xl',
+  xl: 'sm:max-w-5xl',
+};
+
+export default function Modal({
+  isOpen,
+  onClose,
+  title,
+  description,
+  children,
+  size = 'md',
+}) {
+  const panelRef = useRef(null);
+  const restoreRef = useRef(null);
+
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
-    return () => {
-      document.body.style.overflow = 'unset';
+    if (!isOpen) return;
+
+    restoreRef.current = document.activeElement;
+    document.body.style.overflow = 'hidden';
+
+    const panel = panelRef.current;
+    const focusable = () =>
+      Array.from(
+        panel?.querySelectorAll(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        ) || []
+      );
+
+    // Land on the first field so a keyboard user starts where the work is.
+    const items = focusable();
+    (items.find((el) => /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) || items[0])?.focus();
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const items = focusable();
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
-  }, [isOpen]);
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = '';
+      restoreRef.current?.focus?.();
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
-  const sizes = {
-    sm: 'max-w-md',
-    md: 'max-w-2xl',
-    lg: 'max-w-4xl',
-    xl: 'max-w-6xl'
-  };
-
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-end sm:items-center justify-center p-0 sm:p-4">
-        {/* Backdrop */}
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
-          onClick={onClose}
-        />
+      <div
+        className="fixed inset-0 bg-board/55 backdrop-blur-[1px]"
+        onClick={onClose}
+        aria-hidden="true"
+      />
 
-        {/* Modal */}
-        <div className={`relative bg-white rounded-t-lg sm:rounded-lg shadow-xl ${sizes[size]} w-full max-h-[90vh] overflow-y-auto`}>
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-zinc-200 sticky top-0 bg-white z-10">
-            <h3 className="text-base sm:text-lg font-semibold text-zinc-900">{title}</h3>
+      <div className="relative flex min-h-full items-end sm:items-center justify-center p-0 sm:p-6">
+        <div
+          ref={panelRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-title"
+          className={`relative w-full ${sizes[size]} bg-surface rounded-t-xl sm:rounded-xl border border-rule shadow-[0_16px_48px_-12px_rgba(23,33,31,0.28)] max-h-[92vh] overflow-y-auto animate-lift-in`}
+        >
+          <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-rule sticky top-0 bg-surface z-10">
+            <div>
+              <h2 id="modal-title" className="type-title text-[17px] text-ink">
+                {title}
+              </h2>
+              {description && (
+                <p className="mt-1 text-[13px] text-ink-2">{description}</p>
+              )}
+            </div>
             <button
+              type="button"
               onClick={onClose}
-              className="text-zinc-400 hover:text-zinc-600 transition-colors p-1"
-              aria-label="Close modal"
+              aria-label="Close"
+              className="-mr-1.5 -mt-1 shrink-0 h-9 w-9 inline-flex items-center justify-center rounded-md text-ink-2 hover:text-ink hover:bg-paper transition-colors"
             >
-              <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <path d="M6 6l12 12M18 6L6 18" />
               </svg>
             </button>
           </div>
 
-          {/* Body */}
-          <div className="px-4 sm:px-6 py-4">
-            {children}
-          </div>
+          <div className="px-5 py-5">{children}</div>
         </div>
       </div>
     </div>

@@ -1,274 +1,246 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Layout from '../components/Layout';
 import Modal from '../components/Modal';
+import Button from '../components/Button';
+import PageHeader from '../components/PageHeader';
+import LoadingState from '../components/LoadingState';
+import LiveCode from '../components/LiveCode';
+import EmptyState from '../components/EmptyState';
+import Spine, { SpineEntry } from '../components/Spine';
+import Badge from '../components/Badge';
 import { attendanceSessionAPI } from '../utils/api';
+import { useToast } from '../context/ToastContext';
+import useLiveSessions from '../utils/useLiveSessions';
+import { formatDay, formatTime, relativeToNow, sessionState } from '../utils/session';
 
-// Component to display active code with countdown
-function ActiveCodeDisplay({ session, onRefresh }) {
-  const [timeLeft, setTimeLeft] = useState(0);
+// A session is named for the day it runs, so it reads the same in the app
+// and in the club's own notes: 11.09.26.Friday
+const titleForDate = (date) => {
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = String(date.getFullYear()).slice(-2);
+  const dayName = date.toLocaleDateString('en-IN', { weekday: 'long' });
+  return `${day}.${month}.${year}.${dayName}`;
+};
 
-  useEffect(() => {
-    const calculateTimeLeft = () => {
-      if (!session.codeExpiry) return 0;
-      const diff = new Date(session.codeExpiry) - new Date();
-      return Math.max(0, Math.floor(diff / 1000));
-    };
-
-    setTimeLeft(calculateTimeLeft());
-
-    const interval = setInterval(() => {
-      const newTimeLeft = calculateTimeLeft();
-      setTimeLeft(newTimeLeft);
-      
-      if (newTimeLeft === 0) {
-        onRefresh();
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [session.codeExpiry, onRefresh]);
-
-  const minutes = Math.floor(timeLeft / 60);
-  const seconds = timeLeft % 60;
-  const isExpiringSoon = timeLeft < 120; // Less than 2 minutes
-
-  // Check if session is currently active
-  const now = new Date();
-  const isSessionActive = now >= new Date(session.startTime) && now <= new Date(session.endTime);
-
-  if (!isSessionActive) {
-    return (
-      <div className="rounded-lg p-4 border-2 bg-[#fafafa] border-[#e4e4e4]">
-        <p className="text-sm text-[#6b6b6b] text-center">
-          Code will appear automatically when session starts
-        </p>
-      </div>
-    );
-  }
-
-  if (!session.activeCode || timeLeft === 0) {
-    return (
-      <div className="rounded-lg p-4 border-2 bg-[#fff7ed] border-[#fb923c]">
-        <p className="text-sm text-[#ea580c] text-center">
-          Generating new code...
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className={`rounded-lg p-4 border-2 ${
-      isExpiringSoon 
-        ? 'bg-[#fff7ed] border-[#fb923c]' 
-        : 'bg-[#f0fdf4] border-[#86efac]'
-    }`}>
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs text-[#6b6b6b] mb-1">Active Code</p>
-          <p className="text-3xl font-bold font-mono tracking-wider text-[#111111]">
-            {session.activeCode}
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="text-xs text-[#6b6b6b] mb-1">Expires in</p>
-          <p className={`text-2xl font-bold font-mono ${
-            isExpiringSoon ? 'text-[#ea580c]' : 'text-[#16a34a]'
-          }`}>
-            {minutes}:{seconds.toString().padStart(2, '0')}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
+const SESSION_HOURS = 3;
 
 export default function AdminSessions() {
-  const [sessions, setSessions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
+  const { sessions, loading, error, refresh } = useLiveSessions();
+  const toast = useToast();
+  const [openDialog, setOpenDialog] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    fetchSessions();
-    
-    // Auto-refresh every 30 seconds to get new codes
-    const interval = setInterval(fetchSessions, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const fetchSessions = async () => {
-    try {
-      const response = await attendanceSessionAPI.getAll();
-      setSessions(response.data.data);
-    } catch (error) {
-      console.error('Error fetching sessions:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSubmit = async (e) => {
+  const handleCreate = async (e) => {
     e.preventDefault();
-
+    setBusy(true);
     try {
       const startTime = new Date();
-      const endTime = new Date(startTime.getTime() + 3 * 60 * 60 * 1000);
-
-      const title = generateSessionTitle(startTime);
-
-      const payload = {
-        title,
+      const endTime = new Date(startTime.getTime() + SESSION_HOURS * 3600 * 1000);
+      await attendanceSessionAPI.create({
+        title: titleForDate(startTime),
         startTime: startTime.toISOString(),
-        endTime: endTime.toISOString()
-      };
-
-      await attendanceSessionAPI.create(payload);
-      setShowModal(false);
-      fetchSessions();
-      alert('Session created successfully!');
-    } catch (error) {
-      alert(error.response?.data?.message || 'Failed to create session');
+        endTime: endTime.toISOString(),
+      });
+      setOpenDialog(false);
+      await refresh();
+      toast.done('Session opened. The code is live now.');
+    } catch (err) {
+      toast.blocked(err.response?.data?.message || 'The session could not be opened.');
+    } finally {
+      setBusy(false);
     }
   };
 
-  // Generate session title from date (e.g., "28.04.26.Saturday")
-  const generateSessionTitle = (date) => {
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = String(date.getFullYear()).slice(-2);
-    const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
-    return `${day}.${month}.${year}.${dayName}`;
-  };
-
-  const handleDelete = async (sessionId) => {
-    if (!confirm('Are you sure you want to delete this session?')) return;
-
+  const handleDelete = async () => {
+    if (!pendingDelete) return;
+    setBusy(true);
     try {
-      await attendanceSessionAPI.delete(sessionId);
-      fetchSessions();
-      alert('Session deleted successfully');
-    } catch (error) {
-      alert(error.response?.data?.message || 'Failed to delete session');
+      await attendanceSessionAPI.delete(pendingDelete._id);
+      setPendingDelete(null);
+      await refresh();
+      toast.done('Session deleted.');
+    } catch (err) {
+      toast.blocked(err.response?.data?.message || 'The session could not be deleted.');
+    } finally {
+      setBusy(false);
     }
   };
 
-  const formatDateTime = (date) => {
-    return new Date(date).toLocaleString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  const running = sessions.filter((s) => sessionState(s) === 'live');
+  const scheduled = sessions
+    .filter((s) => sessionState(s) === 'upcoming')
+    .sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+  const closed = sessions.filter((s) => sessionState(s) === 'ended');
 
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-64">
-          <p className="text-zinc-500">Loading sessions...</p>
-        </div>
+        <LoadingState label="Loading sessions" />
       </Layout>
     );
   }
 
   return (
     <Layout>
-      <div className="w-full max-w-7xl mx-auto">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
-          <h1 className="text-xl sm:text-2xl font-semibold text-[#111111]">
-            Manage Attendance Sessions
-          </h1>
-          <button
-            onClick={() => setShowModal(true)}
-            className="w-full sm:w-auto h-11 sm:h-9 px-4 bg-[#111111] text-white text-sm font-medium rounded-md hover:bg-[#2a2a2a] active:scale-[0.98] transition-all"
-          >
-            + Create Session
-          </button>
+      <PageHeader
+        title="Sessions"
+        lede="Opening a session starts a three-hour window and issues a code that rotates every ten minutes. Volunteers can only record attendance while it is running."
+        actions={
+          <Button onClick={() => setOpenDialog(true)}>Open a session</Button>
+        }
+      />
+
+      {error && (
+        <div role="alert" className="mb-6 rounded-lg border border-brick-line bg-brick-wash px-4 py-3">
+          <p className="text-sm text-brick">{error}</p>
         </div>
+      )}
 
-        {sessions.length === 0 ? (
-          <div className="bg-white border border-[#e4e4e4] rounded-lg p-8 sm:p-12 text-center">
-            <p className="text-[#6b6b6b] text-sm mb-4">No sessions yet</p>
-            <button
-              onClick={() => setShowModal(true)}
-              className="h-11 sm:h-9 px-4 bg-[#111111] text-white text-sm font-medium rounded-md hover:bg-[#2a2a2a] active:scale-[0.98] transition-all"
-            >
-              Create First Session
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-3 sm:space-y-4">
-            {sessions.map((session) => (
-              <div
-                key={session._id}
-                className="bg-white border border-[#e4e4e4] rounded-lg p-4 sm:p-5 hover:shadow-sm transition-shadow"
-              >
-                <div className="flex flex-col gap-4">
-                    <div className="flex-1">
-                      <h3 className="text-sm sm:text-[15px] font-semibold text-[#111111] mb-3">
-                        {session.title}
-                      </h3>
-
-                      <div className="text-xs sm:text-[13px] text-[#6b6b6b] space-y-1 mb-3">
-                        <p>
-                          <span className="font-medium">Start:</span> {formatDateTime(session.startTime)}
-                        </p>
-                        <p>
-                          <span className="font-medium">End:</span> {formatDateTime(session.endTime)}
-                        </p>
-                      </div>
-
-                      <ActiveCodeDisplay session={session} onRefresh={fetchSessions} />
-                    </div>
-
-                    <div className="flex justify-end">
+      {sessions.length === 0 ? (
+        <EmptyState
+          title="No sessions yet"
+          description="Open one when volunteers are heading out to the village. It runs for three hours."
+          action={<Button onClick={() => setOpenDialog(true)}>Open a session</Button>}
+        />
+      ) : (
+        <div className="space-y-10">
+          {running.length > 0 && (
+            <section>
+              <h2 className="type-title mb-4 text-[15px] text-ink">Running now</h2>
+              <div className="space-y-5">
+                {running.map((session) => (
+                  <div key={session._id}>
+                    <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                      <h3 className="text-sm font-medium text-ink">{session.title}</h3>
                       <button
-                        onClick={() => handleDelete(session._id)}
-                        className="h-11 sm:h-9 px-4 bg-white border border-[#e4e4e4] text-[#dc2626] text-sm font-medium rounded-md hover:bg-[#fef2f2] transition-colors"
+                        type="button"
+                        onClick={() => setPendingDelete(session)}
+                        className="text-[13px] text-brick underline underline-offset-4 hover:opacity-80"
                       >
                         Delete
                       </button>
                     </div>
+                    <LiveCode session={session} onExpire={refresh} />
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            </section>
+          )}
+
+          {scheduled.length > 0 && (
+            <section>
+              <h2 className="type-title mb-4 text-[15px] text-ink">Scheduled</h2>
+              <Spine>
+                {scheduled.map((session) => (
+                  <SpineEntry key={session._id} state="upcoming">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                      <div>
+                        <p className="text-sm font-medium text-ink">{session.title}</p>
+                        <p className="text-[13px] text-ink-2">
+                          {formatDay(session.startTime)}, {formatTime(session.startTime)} to{' '}
+                          {formatTime(session.endTime)}
+                          <span className="text-ink-3"> · {relativeToNow(session.startTime)}</span>
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPendingDelete(session)}
+                        className="text-[13px] text-brick underline underline-offset-4 hover:opacity-80"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </SpineEntry>
+                ))}
+              </Spine>
+            </section>
+          )}
+
+          {closed.length > 0 && (
+            <section>
+              <h2 className="type-title mb-4 text-[15px] text-ink">Closed</h2>
+              <Spine>
+                {closed.map((session) => (
+                  <SpineEntry key={session._id} state="done">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                      <div>
+                        <p className="text-sm text-ink">{session.title}</p>
+                        <p className="text-[13px] text-ink-2">
+                          {formatDay(session.startTime)}, {formatTime(session.startTime)} to{' '}
+                          {formatTime(session.endTime)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Badge variant="quiet">Closed</Badge>
+                        <button
+                          type="button"
+                          onClick={() => setPendingDelete(session)}
+                          className="text-[13px] text-brick underline underline-offset-4 hover:opacity-80"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </SpineEntry>
+                ))}
+              </Spine>
+            </section>
+          )}
+        </div>
+      )}
+
+      <Modal
+        isOpen={openDialog}
+        onClose={() => setOpenDialog(false)}
+        title="Open a session"
+        description="It starts immediately and closes three hours from now."
+        size="sm"
+      >
+        <form onSubmit={handleCreate}>
+          <div className="rounded-lg border border-rule bg-paper px-4 py-4">
+            <p className="text-[13px] text-ink-2">Session name</p>
+            <p className="type-title mt-0.5 text-[17px] text-ink">
+              {titleForDate(new Date())}
+            </p>
+            <p className="mt-3 text-[13px] text-ink-2">
+              Closes at{' '}
+              {formatTime(new Date(Date.now() + SESSION_HOURS * 3600 * 1000))}
+            </p>
           </div>
-        )}
 
-        {/* Create Session Modal */}
-        <Modal
-          isOpen={showModal}
-          onClose={() => setShowModal(false)}
-          title="Create Attendance Session"
-        >
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-4">
-              <p className="text-sm text-zinc-900 font-medium mb-1">
-                Session Name
-              </p>
-              <p className="text-lg font-semibold text-zinc-900">
-                {generateSessionTitle(new Date())}
-              </p>
-            </div>
+          <div className="mt-5 flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setOpenDialog(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={busy}>
+              {busy ? 'Opening' : 'Open session'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
-            <div className="flex justify-end gap-3 pt-4">
-              <button
-                type="button"
-                onClick={() => setShowModal(false)}
-                className="h-9 px-4 bg-white border border-[#e4e4e4] text-[#111111] text-[13px] font-medium rounded-md hover:bg-[#fafafa] transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="h-9 px-4 bg-[#111111] text-white text-[13px] font-medium rounded-md hover:bg-[#2a2a2a] transition-colors"
-              >
-                Create Session
-              </button>
-            </div>
-          </form>
-        </Modal>
-      </div>
+      <Modal
+        isOpen={!!pendingDelete}
+        onClose={() => setPendingDelete(null)}
+        title="Delete this session?"
+        description={pendingDelete?.title}
+        size="sm"
+      >
+        <p className="text-sm text-ink-2">
+          Attendance already recorded against this session will no longer be
+          reachable from the report. This cannot be undone.
+        </p>
+        <div className="mt-5 flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setPendingDelete(null)}>
+            Keep it
+          </Button>
+          <Button variant="danger" onClick={handleDelete} disabled={busy}>
+            {busy ? 'Deleting' : 'Delete session'}
+          </Button>
+        </div>
+      </Modal>
     </Layout>
   );
 }

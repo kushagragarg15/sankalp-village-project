@@ -2,43 +2,145 @@
 @tailwind components;
 @tailwind utilities;
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    height: 100%;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    min-height: 100vh;
+    background-color: theme('colors.paper.DEFAULT');
+    color: theme('colors.ink.DEFAULT');
+    font-family: theme('fontFamily.sans');
+    font-size: 15px;
+    line-height: 1.55;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* iOS zooms the viewport when a focused field is under 16px. */
+  input,
+  textarea,
+  select {
+    font-family: inherit;
+    font-size: 16px;
+  }
+
+  button {
+    font-family: inherit;
+  }
+
+  /* One focus treatment everywhere, visible on both grounds. */
+  :focus-visible {
+    outline: 2px solid theme('colors.gold.DEFAULT');
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background-color: theme('colors.gold.line');
+    color: theme('colors.ink.DEFAULT');
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: theme('colors.rule.strong');
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 6px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: theme('colors.ink.3');
+    background-clip: content-box;
+  }
 }
 
-html {
-  height: 100%;
+@layer components {
+  /* Archivo carries a width axis; the expanded cut is the display voice. */
+  .type-display {
+    font-stretch: 118%;
+    font-weight: 700;
+    letter-spacing: theme('letterSpacing.display');
+    line-height: 1.08;
+  }
+
+  .type-title {
+    font-stretch: 112%;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    line-height: 1.2;
+  }
+
+  /* The chronological spine: a rule with a tick at each entry. */
+  .spine {
+    position: relative;
+    padding-left: 28px;
+  }
+
+  .spine::before {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 22px;
+    bottom: 22px;
+    width: 1px;
+    background: theme('colors.rule.DEFAULT');
+  }
+
+  /* The tick sits outside the list's padding so it centres on the rule. */
+  .spine-tick::before {
+    content: '';
+    position: absolute;
+    left: -28px;
+    top: 17px;
+    width: 11px;
+    height: 11px;
+    border-radius: 999px;
+    border: 1px solid theme('colors.rule.strong');
+    background: theme('colors.paper.DEFAULT');
+  }
+
+  .spine-tick[data-state='live']::before {
+    border-color: theme('colors.gold.DEFAULT');
+    background: theme('colors.gold.DEFAULT');
+    box-shadow: 0 0 0 3px theme('colors.gold.wash');
+  }
+
+  .spine-tick[data-state='done']::before {
+    border-color: theme('colors.rule.strong');
+    background: theme('colors.rule.strong');
+  }
 }
 
-body {
-  min-height: 100vh;
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* Prevent mobile zoom on input focus */
-input, textarea, select {
-  font-size: 16px;
-}
-
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: #f4f4f5;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #d4d4d8;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #a1a1aa;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

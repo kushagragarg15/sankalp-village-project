@@ -1,338 +1,272 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import api from '../utils/api';
 import Layout from '../components/Layout';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import PageHeader from '../components/PageHeader';
+import LoadingState from '../components/LoadingState';
+import StatStrip from '../components/StatStrip';
+import EmptyState from '../components/EmptyState';
+import {
+  AXIS,
+  ChartFrame,
+  ChartTooltip,
+  GRID,
+  Legend,
+  SERIES,
+} from '../components/Chart';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import { isLive } from '../utils/session';
+
+const tickStyle = { fontSize: 12, fill: AXIS, fontFamily: 'Archivo, sans-serif' };
+
+function rankBy(logs, pick, limit = 8) {
+  const counts = {};
+  logs.forEach((log) => {
+    const key = pick(log);
+    if (!key) return;
+    counts[key] = (counts[key] || 0) + 1;
+  });
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([name, lessons]) => ({ name, lessons }));
+}
 
 export default function Analytics() {
-  const [stats, setStats] = useState({
-    totalVolunteers: 0,
-    totalStudents: 0,
-    totalSessions: 0,
-    totalTeachingLogs: 0,
-    activeSessions: 0
-  });
   const [sessions, setSessions] = useState([]);
-  const [teachingLogs, setTeachingLogs] = useState([]);
+  const [logs, setLogs] = useState([]);
+  const [counts, setCounts] = useState({ volunteers: 0, students: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchAnalytics();
+    (async () => {
+      try {
+        const [sessionsRes, logsRes, usersRes, studentsRes] = await Promise.all([
+          api.get('/attendance-sessions'),
+          api.get('/teaching-logs'),
+          api.get('/users'),
+          api.get('/students'),
+        ]);
+        setSessions(sessionsRes.data.data || []);
+        setLogs(logsRes.data.data || []);
+        setCounts({
+          volunteers: (usersRes.data.data || []).filter((u) => u.role === 'volunteer')
+            .length,
+          students: (studentsRes.data.data || []).length,
+        });
+      } catch {
+        setSessions([]);
+        setLogs([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
-  const fetchAnalytics = async () => {
-    try {
-      const [sessionsRes, logsRes, volunteersRes, studentsRes] = await Promise.all([
-        api.get('/attendance-sessions'),
-        api.get('/teaching-logs'),
-        api.get('/users'),
-        api.get('/students')
-      ]);
+  const activity = useMemo(() => {
+    const days = [];
+    for (let i = 29; i >= 0; i -= 1) {
+      const date = new Date();
+      date.setHours(0, 0, 0, 0);
+      date.setDate(date.getDate() - i);
+      const key = date.toDateString();
 
-      setSessions(sessionsRes.data.data);
-      setTeachingLogs(logsRes.data.data);
-
-      // Calculate stats
-      const volunteers = volunteersRes.data.data.filter(u => u.role === 'volunteer');
-      const now = new Date();
-      const activeSessions = sessionsRes.data.data.filter(s => 
-        now >= new Date(s.startTime) && now <= new Date(s.endTime)
+      const dayLogs = logs.filter(
+        (log) => new Date(log.timestamp).toDateString() === key
       );
 
-      setStats({
-        totalVolunteers: volunteers.length,
-        totalStudents: studentsRes.data.data.length,
-        totalSessions: sessionsRes.data.data.length,
-        totalTeachingLogs: logsRes.data.data.length,
-        activeSessions: activeSessions.length
+      days.push({
+        date: date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+        lessons: dayLogs.length,
+        children: new Set(dayLogs.map((l) => l.studentId?._id)).size,
       });
-    } catch (error) {
-      console.error('Error fetching analytics:', error);
-    } finally {
-      setLoading(false);
     }
-  };
+    return days;
+  }, [logs]);
+
+  const subjects = useMemo(() => rankBy(logs, (l) => l.subject, 8), [logs]);
+  const volunteers = useMemo(
+    () => rankBy(logs, (l) => l.volunteerId?.name, 8),
+    [logs]
+  );
+  const students = useMemo(() => rankBy(logs, (l) => l.studentId?.name, 8), [logs]);
 
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-64">
-          <p className="text-zinc-500">Loading analytics...</p>
-        </div>
+        <LoadingState label="Reading the register" />
       </Layout>
     );
   }
 
-  // Teaching activity by date (last 30 days)
-  const last30Days = [];
-  for (let i = 29; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    const dateStr = date.toISOString().split('T')[0];
-    
-    const logsForDate = teachingLogs.filter(log => {
-      const logDate = new Date(log.timestamp).toISOString().split('T')[0];
-      return logDate === dateStr;
-    });
-
-    last30Days.push({
-      date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      logs: logsForDate.length,
-      students: new Set(logsForDate.map(l => l.studentId?._id)).size
-    });
-  }
-
-  // Subject distribution
-  const subjectCounts = {};
-  teachingLogs.forEach(log => {
-    subjectCounts[log.subject] = (subjectCounts[log.subject] || 0) + 1;
-  });
-  const subjectData = Object.entries(subjectCounts).map(([subject, count]) => ({
-    subject,
-    count,
-    percentage: Math.round((count / teachingLogs.length) * 100)
-  }));
-
-  // Volunteer activity (top 10)
-  const volunteerCounts = {};
-  teachingLogs.forEach(log => {
-    const volName = log.volunteerId?.name || 'Unknown';
-    volunteerCounts[volName] = (volunteerCounts[volName] || 0) + 1;
-  });
-  const topVolunteers = Object.entries(volunteerCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .map(([name, count]) => ({ name, sessions: count }));
-
-  // Student engagement (students with most sessions)
-  const studentCounts = {};
-  teachingLogs.forEach(log => {
-    const studentName = log.studentId?.name || 'Unknown';
-    studentCounts[studentName] = (studentCounts[studentName] || 0) + 1;
-  });
-  const topStudents = Object.entries(studentCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .map(([name, count]) => ({ name, sessions: count }));
-
-  // Chart colors
-  const COLORS = ['#1A1A1A', '#3D3D3D', '#666666', '#888888', '#AAAAAA'];
+  const hasActivity = activity.some((d) => d.lessons > 0);
 
   return (
     <Layout>
-      <div className="w-full max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-semibold text-zinc-900">Analytics Dashboard</h1>
-          <p className="text-sm text-zinc-500">Real-time teaching insights</p>
-        </div>
+      <PageHeader
+        title="Insights"
+        lede="What the register adds up to: how often the club teaches, who turns up, and which children are being reached."
+      />
 
-        {/* Summary Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-          <div className="bg-white border border-zinc-200 rounded-lg p-5 hover:shadow-sm transition-shadow">
-            <p className="text-xs text-zinc-500 mb-1">Total Volunteers</p>
-            <p className="text-3xl font-semibold text-zinc-900">{stats.totalVolunteers}</p>
-          </div>
+      <StatStrip
+        className="mb-8"
+        items={[
+          { label: 'Lessons recorded', value: logs.length },
+          { label: 'Children enrolled', value: counts.students },
+          { label: 'Volunteers', value: counts.volunteers },
+          {
+            label: 'Sessions run',
+            value: sessions.length,
+            note: sessions.some(isLive) ? 'one running now' : undefined,
+            accent: sessions.some(isLive),
+          },
+        ]}
+      />
 
-          <div className="bg-white border border-zinc-200 rounded-lg p-5 hover:shadow-sm transition-shadow">
-            <p className="text-xs text-zinc-500 mb-1">Total Students</p>
-            <p className="text-3xl font-semibold text-zinc-900">{stats.totalStudents}</p>
-          </div>
-
-          <div className="bg-white border border-zinc-200 rounded-lg p-5 hover:shadow-sm transition-shadow">
-            <p className="text-xs text-zinc-500 mb-1">Total Sessions</p>
-            <p className="text-3xl font-semibold text-zinc-900">{stats.totalSessions}</p>
-          </div>
-
-          <div className="bg-white border border-zinc-200 rounded-lg p-5 hover:shadow-sm transition-shadow">
-            <p className="text-xs text-zinc-500 mb-1">Teaching Logs</p>
-            <p className="text-3xl font-semibold text-zinc-900">{stats.totalTeachingLogs}</p>
-          </div>
-
-          <div className="bg-white border border-zinc-200 rounded-lg p-5 hover:shadow-sm transition-shadow">
-            <p className="text-xs text-zinc-500 mb-1">Active Now</p>
-            <p className="text-3xl font-semibold text-emerald-600">{stats.activeSessions}</p>
-          </div>
-        </div>
-
-        {/* Teaching Activity Trend */}
-        <div className="bg-white border border-zinc-200 rounded-lg p-6 mb-6">
-          <h2 className="text-base font-semibold text-zinc-900 mb-4">Teaching Activity (Last 30 Days)</h2>
-          {last30Days.filter(d => d.logs > 0).length === 0 ? (
-            <p className="text-zinc-500 text-center py-8 text-sm">No teaching activity in the last 30 days</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={last30Days}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis 
-                  dataKey="date" 
-                  stroke="#999" 
-                  style={{ fontSize: '11px' }}
+      {logs.length === 0 ? (
+        <EmptyState
+          title="Nothing to measure yet"
+          description="Once volunteers start recording lessons, this page shows how the club's teaching adds up over time."
+        />
+      ) : (
+        <div className="space-y-6">
+          <ChartFrame
+            title="Teaching over the last 30 days"
+            note="Lessons recorded each day, and how many different children they reached."
+            empty={!hasActivity}
+            emptyNote="No lessons were recorded in the last 30 days."
+          >
+            <Legend
+              items={[
+                { label: 'Lessons', color: SERIES.primary },
+                { label: 'Children reached', color: SERIES.secondary },
+              ]}
+            />
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={activity} margin={{ top: 8, right: 12, bottom: 0, left: -18 }}>
+                <CartesianGrid stroke={GRID} strokeDasharray="0" vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  tick={tickStyle}
+                  tickLine={false}
+                  axisLine={{ stroke: GRID }}
                   interval="preserveStartEnd"
+                  minTickGap={28}
                 />
-                <YAxis stroke="#999" style={{ fontSize: '11px' }} />
+                <YAxis
+                  tick={tickStyle}
+                  tickLine={false}
+                  axisLine={false}
+                  allowDecimals={false}
+                  width={44}
+                />
                 <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#fff',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '6px',
-                    fontSize: '12px'
-                  }}
-                />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="logs"
-                  name="Teaching Logs"
-                  stroke="#1A1A1A"
-                  strokeWidth={2}
-                  dot={{ fill: '#1A1A1A', r: 3 }}
+                  content={<ChartTooltip />}
+                  cursor={{ stroke: AXIS, strokeWidth: 1, strokeDasharray: '3 3' }}
                 />
                 <Line
                   type="monotone"
-                  dataKey="students"
-                  name="Unique Students"
-                  stroke="#666666"
+                  dataKey="lessons"
+                  name="Lessons"
+                  stroke={SERIES.primary}
                   strokeWidth={2}
-                  dot={{ fill: '#666666', r: 3 }}
+                  dot={false}
+                  activeDot={{ r: 4, strokeWidth: 2, stroke: '#FFFFFF' }}
+                  isAnimationActive={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="children"
+                  name="Children reached"
+                  stroke={SERIES.secondary}
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 4, strokeWidth: 2, stroke: '#FFFFFF' }}
+                  isAnimationActive={false}
                 />
               </LineChart>
             </ResponsiveContainer>
-          )}
-        </div>
+          </ChartFrame>
 
-        {/* Subject Distribution & Top Volunteers */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Subject Distribution */}
-          <div className="bg-white border border-zinc-200 rounded-lg p-6">
-            <h2 className="text-base font-semibold text-zinc-900 mb-4">Subject Distribution</h2>
-            {subjectData.length === 0 ? (
-              <p className="text-zinc-500 text-center py-8 text-sm">No subject data available</p>
-            ) : (
-              <div className="flex items-center justify-center">
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={subjectData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ subject, percentage }) => `${subject} (${percentage}%)`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="count"
-                    >
-                      {subjectData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#fff',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '6px',
-                        fontSize: '12px'
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            )}
+          <div className="grid gap-6 lg:grid-cols-2">
+            <ChartFrame
+              title="Subjects taught"
+              note="Lessons recorded per subject."
+              empty={subjects.length === 0}
+              emptyNote="No subjects recorded yet."
+            >
+              <RankedBars data={subjects} />
+            </ChartFrame>
+
+            <ChartFrame
+              title="Volunteers by lessons taught"
+              note="The eight who have recorded the most."
+              empty={volunteers.length === 0}
+              emptyNote="No volunteer activity yet."
+            >
+              <RankedBars data={volunteers} />
+            </ChartFrame>
           </div>
 
-          {/* Top Active Volunteers */}
-          <div className="bg-white border border-zinc-200 rounded-lg p-6">
-            <h2 className="text-base font-semibold text-zinc-900 mb-4">Top Active Volunteers</h2>
-            {topVolunteers.length === 0 ? (
-              <p className="text-zinc-500 text-center py-8 text-sm">No volunteer data available</p>
-            ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={topVolunteers} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis type="number" stroke="#999" style={{ fontSize: '11px' }} />
-                  <YAxis 
-                    type="category" 
-                    dataKey="name" 
-                    stroke="#999" 
-                    style={{ fontSize: '11px' }}
-                    width={100}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#fff',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '6px',
-                      fontSize: '12px'
-                    }}
-                  />
-                  <Bar dataKey="sessions" fill="#1A1A1A" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
+          <ChartFrame
+            title="Children reached most often"
+            note="The eight students with the most recorded lessons."
+            empty={students.length === 0}
+            emptyNote="No student activity yet."
+          >
+            <RankedBars data={students} />
+          </ChartFrame>
         </div>
-
-        {/* Most Engaged Students */}
-        <div className="bg-white border border-zinc-200 rounded-lg p-6">
-          <h2 className="text-base font-semibold text-zinc-900 mb-4">Most Engaged Students</h2>
-          {topStudents.length === 0 ? (
-            <p className="text-zinc-500 text-center py-8 text-sm">No student engagement data available</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={topStudents}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis 
-                  dataKey="name" 
-                  stroke="#999" 
-                  style={{ fontSize: '11px' }}
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                />
-                <YAxis stroke="#999" style={{ fontSize: '11px' }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#fff',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '6px',
-                    fontSize: '12px'
-                  }}
-                />
-                <Bar dataKey="sessions" fill="#1A1A1A" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-
-        {/* Summary Insights */}
-        {teachingLogs.length > 0 && (
-          <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-6 mt-6">
-            <h2 className="text-base font-semibold text-zinc-900 mb-3">Key Insights</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-              <div>
-                <p className="text-zinc-600">Average sessions per volunteer</p>
-                <p className="text-2xl font-semibold text-zinc-900 mt-1">
-                  {stats.totalVolunteers > 0 
-                    ? Math.round(stats.totalTeachingLogs / stats.totalVolunteers) 
-                    : 0}
-                </p>
-              </div>
-              <div>
-                <p className="text-zinc-600">Average sessions per student</p>
-                <p className="text-2xl font-semibold text-zinc-900 mt-1">
-                  {stats.totalStudents > 0 
-                    ? Math.round(stats.totalTeachingLogs / stats.totalStudents) 
-                    : 0}
-                </p>
-              </div>
-              <div>
-                <p className="text-zinc-600">Most popular subject</p>
-                <p className="text-2xl font-semibold text-zinc-900 mt-1">
-                  {subjectData.length > 0 ? subjectData[0].subject : 'N/A'}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      )}
     </Layout>
+  );
+}
+
+// One measure, one hue — magnitude compared across a ranked list.
+function RankedBars({ data }) {
+  return (
+    <ResponsiveContainer width="100%" height={Math.max(160, data.length * 34 + 24)}>
+      <BarChart
+        data={data}
+        layout="vertical"
+        margin={{ top: 4, right: 28, bottom: 4, left: 4 }}
+        barCategoryGap={6}
+      >
+        <CartesianGrid stroke={GRID} horizontal={false} />
+        <XAxis type="number" hide allowDecimals={false} />
+        <YAxis
+          type="category"
+          dataKey="name"
+          tick={tickStyle}
+          tickLine={false}
+          axisLine={false}
+          width={104}
+        />
+        <Tooltip content={<ChartTooltip />} cursor={{ fill: '#F1F2EE' }} />
+        <Bar
+          dataKey="lessons"
+          name="Lessons"
+          fill={SERIES.primary}
+          radius={[0, 4, 4, 0]}
+          barSize={14}
+          isAnimationActive={false}
+          label={{
+            position: 'right',
+            fill: AXIS,
+            fontSize: 12,
+            fontFamily: 'Archivo, sans-serif',
+          }}
+        />
+      </BarChart>
+    </ResponsiveContainer>
   );
 }

@@ -1,200 +1,135 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { attendanceSessionAPI, registrationAPI, teachingLogAPI } from '../utils/api';
+import PageHeader from '../components/PageHeader';
+import LoadingState from '../components/LoadingState';
+import EmptyState from '../components/EmptyState';
+import Button from '../components/Button';
+import Badge from '../components/Badge';
+import SessionRow from '../components/SessionRow';
+import { registrationAPI } from '../utils/api';
+import { useToast } from '../context/ToastContext';
+import useLiveSessions from '../utils/useLiveSessions';
+import { sessionState } from '../utils/session';
 
 export default function VolunteerSessions() {
   const navigate = useNavigate();
-  const [sessions, setSessions] = useState([]);
-  const [myRegistrations, setMyRegistrations] = useState([]);
-  const [myLogs, setMyLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const toast = useToast();
+  const { sessions, loading, error, refresh } = useLiveSessions();
+  const [registrations, setRegistrations] = useState([]);
   const [registering, setRegistering] = useState(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const loadRegistrations = async () => {
     try {
-      setError(null);
-      const [sessionsRes, registrationsRes] = await Promise.all([
-        attendanceSessionAPI.getAll(),
-        registrationAPI.getMyRegistrations()
-      ]);
-
-      console.log('Sessions response:', sessionsRes);
-      console.log('Sessions data:', sessionsRes.data);
-      
-      setSessions(sessionsRes.data.data || []);
-      setMyRegistrations(registrationsRes.data.data || []);
-      setMyLogs([]); // Skip loading logs for now
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      console.error('Error details:', error.response?.data);
-      setError(error.response?.data?.message || error.message || 'Failed to load sessions');
-      // Set empty arrays on error to show "no sessions" message
-      setSessions([]);
-      setMyRegistrations([]);
-      setMyLogs([]);
-    } finally {
-      setLoading(false);
+      const response = await registrationAPI.getMyRegistrations();
+      setRegistrations(response.data.data || []);
+    } catch {
+      setRegistrations([]);
     }
   };
 
-  const handleRegister = async (sessionId) => {
-    setRegistering(sessionId);
+  useEffect(() => {
+    loadRegistrations();
+  }, []);
+
+  const isRegistered = (sessionId) =>
+    registrations.some((reg) => reg.sessionId?._id === sessionId);
+
+  const handleRegister = async (session) => {
+    setRegistering(session._id);
     try {
-      await registrationAPI.register(sessionId);
-      await fetchData(); // Refresh data
-      alert('Successfully registered for session!');
-    } catch (error) {
-      alert(error.response?.data?.message || 'Failed to register');
+      await registrationAPI.register(session._id);
+      await loadRegistrations();
+      toast.done(`Registered for ${session.title}.`);
+    } catch (err) {
+      toast.blocked(
+        err.response?.data?.message || 'You could not be registered for that session.'
+      );
     } finally {
       setRegistering(null);
     }
   };
 
-  const isRegistered = (sessionId) => {
-    return myRegistrations.some(reg => reg.sessionId?._id === sessionId);
-  };
-
-  const hasSubmittedAttendance = (sessionId) => {
-    return myLogs.some(log => log.sessionId?._id === sessionId || log.sessionId === sessionId);
-  };
-
-  const isSessionActive = (session) => {
-    const now = new Date();
-    return now >= new Date(session.startTime) && now <= new Date(session.endTime);
-  };
-
-  const formatDateTime = (date) => {
-    return new Date(date).toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  const ordered = [...sessions].sort((a, b) => {
+    const rank = { live: 0, upcoming: 1, ended: 2 };
+    const diff = rank[sessionState(a)] - rank[sessionState(b)];
+    if (diff !== 0) return diff;
+    return new Date(a.startTime) - new Date(b.startTime);
+  });
 
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-64">
-          <p className="text-zinc-500">Loading sessions...</p>
-        </div>
+        <LoadingState label="Loading sessions" />
       </Layout>
     );
   }
 
   return (
     <Layout>
-      <div className="w-full max-w-7xl mx-auto">
-        <h1 className="text-xl sm:text-2xl font-semibold text-[#111111] mb-4 sm:mb-6">
-          Attendance Sessions
-        </h1>
+      <PageHeader
+        title="Sessions"
+        lede="Register for a session before it starts. Once it is running, record each student you taught while you are still at the school."
+      />
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <p className="text-sm text-red-600">
-              <strong>Error:</strong> {error}
-            </p>
-            <button
-              onClick={fetchData}
-              className="mt-2 text-sm text-red-700 underline hover:text-red-800"
-            >
-              Try again
-            </button>
-          </div>
-        )}
+      {error && (
+        <div role="alert" className="mb-6 rounded-lg border border-brick-line bg-brick-wash px-4 py-3">
+          <p className="text-sm text-brick">{error}</p>
+          <button
+            type="button"
+            onClick={refresh}
+            className="mt-1.5 text-[13px] text-brick underline underline-offset-4"
+          >
+            Try again
+          </button>
+        </div>
+      )}
 
-        {sessions.length === 0 ? (
-          <div className="bg-white border border-[#e4e4e4] rounded-lg p-8 sm:p-12 text-center">
-            <p className="text-[#6b6b6b] text-sm">No sessions available</p>
-            {!error && (
-              <p className="text-xs text-[#9a9a9a] mt-2">
-                Check back later or contact your administrator
-              </p>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-3 sm:space-y-4">
-            {sessions.map((session) => {
-              const registered = isRegistered(session._id);
-              const active = isSessionActive(session);
-              const submitted = hasSubmittedAttendance(session._id);
+      {ordered.length === 0 ? (
+        <EmptyState
+          title="No sessions yet"
+          description="Your coordinator opens a session before each village visit. Check back closer to the day."
+        />
+      ) : (
+        <div className="space-y-3">
+          {ordered.map((session) => {
+            const state = sessionState(session);
+            const registered = isRegistered(session._id);
 
-              return (
-                <div
-                  key={session._id}
-                  className="bg-white border border-[#e4e4e4] rounded-lg p-4 sm:p-5 hover:shadow-sm transition-shadow"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex flex-wrap items-center gap-2 mb-3">
-                        <h3 className="text-sm sm:text-[15px] font-semibold text-[#111111]">
-                          {session.title}
-                        </h3>
-                        {active && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#f0faf2] text-[#3a7d44] border border-[#c6e8cc]">
-                            Active Now
-                          </span>
-                        )}
-                        {registered && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#eff6ff] text-[#1d4ed8] border border-[#bfdbfe]">
-                            Registered
-                          </span>
-                        )}
-                        {submitted && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#f0fdf4] text-[#15803d] border border-[#bbf7d0]">
-                            ✓ Submitted
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="text-xs sm:text-[13px] text-[#6b6b6b] space-y-1">
-                        <p>
-                          <span className="font-medium">Start:</span> {formatDateTime(session.startTime)}
-                        </p>
-                        <p>
-                          <span className="font-medium">End:</span> {formatDateTime(session.endTime)}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      {!registered ? (
-                        <button
-                          onClick={() => handleRegister(session._id)}
-                          disabled={registering === session._id}
-                          className="h-11 sm:h-9 px-4 bg-[#111111] text-white text-sm font-medium rounded-md hover:bg-[#2a2a2a] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {registering === session._id ? 'Registering...' : 'Register'}
-                        </button>
-                      ) : active ? (
-                        <button
-                          onClick={() => navigate(`/attendance/${session._id}`)}
-                          className="h-11 sm:h-9 px-4 bg-[#3a7d44] text-white text-sm font-medium rounded-md hover:bg-[#2d6335] active:scale-[0.98] transition-all"
-                        >
-                          Submit Attendance
-                        </button>
-                      ) : (
-                        <button
-                          disabled
-                          className="h-11 sm:h-9 px-4 bg-[#e4e4e4] text-[#6b6b6b] text-sm font-medium rounded-md cursor-not-allowed"
-                        >
-                          Session Ended
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+            return (
+              <SessionRow
+                key={session._id}
+                session={session}
+                badges={registered ? [<Badge key="r" variant="recorded">Registered</Badge>] : []}
+                actions={
+                  state === 'ended' ? (
+                    <span className="text-[13px] text-ink-3 self-center">Closed</span>
+                  ) : !registered ? (
+                    <Button
+                      variant={state === 'live' ? 'live' : 'secondary'}
+                      onClick={() => handleRegister(session)}
+                      disabled={registering === session._id}
+                    >
+                      {registering === session._id ? 'Registering' : 'Register'}
+                    </Button>
+                  ) : state === 'live' ? (
+                    <Button
+                      variant="live"
+                      onClick={() => navigate(`/attendance/${session._id}`)}
+                    >
+                      Record attendance
+                    </Button>
+                  ) : (
+                    <span className="text-[13px] text-ink-2 self-center">
+                      You are on the list
+                    </span>
+                  )
+                }
+              />
+            );
+          })}
+        </div>
+      )}
     </Layout>
   );
 }
