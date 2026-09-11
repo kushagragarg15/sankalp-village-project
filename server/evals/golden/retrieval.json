@@ -1,0 +1,49 @@
+{
+  "description": "Golden retrieval set for the Sankalp resource library. `expect` lists substrings of the resource titles whose chunks count as relevant; an empty list means nothing in the library answers this and retrieval should return nothing. `kind` says what the query is testing.",
+  "kinds": {
+    "direct": "Names the topic the way the resource does. Both vector and keyword search should get it.",
+    "paraphrase": "Shares no keywords with the resource. Only semantic search can get it.",
+    "lexical": "An exact, rare term. Keyword search should get it; embeddings may drift.",
+    "cross-grade": "The resource is for an adjacent class. Tests the +/-1 grade filter.",
+    "negative": "Nothing in the library covers it. Anything returned is a false positive."
+  },
+  "queries": [
+    { "id": "frac-direct", "kind": "direct", "topic": "fractions", "subject": "Math", "grade": "Class 4", "expect": ["Introducing Fractions"] },
+    { "id": "frac-cross", "kind": "cross-grade", "topic": "fractions", "subject": "Math", "grade": "Class 5", "expect": ["Introducing Fractions"] },
+    { "id": "frac-para", "kind": "paraphrase", "topic": "sharing one roti equally between children", "subject": "Math", "grade": "Class 4", "expect": ["Introducing Fractions"] },
+    { "id": "frac-lex", "kind": "lexical", "topic": "numerator and denominator", "subject": "Math", "grade": "Class 4", "expect": ["Introducing Fractions"] },
+
+    { "id": "add-direct", "kind": "direct", "topic": "addition and subtraction", "subject": "Math", "grade": "Class 3", "expect": ["Addition and Subtraction"] },
+    { "id": "add-para", "kind": "paraphrase", "topic": "counting stones to find how many are left", "subject": "Math", "grade": "Class 3", "expect": ["Addition and Subtraction"] },
+    { "id": "add-cross", "kind": "cross-grade", "topic": "adding numbers", "subject": "Math", "grade": "Class 2", "expect": ["Addition and Subtraction"] },
+
+    { "id": "geo-direct", "kind": "direct", "topic": "shapes and geometry", "subject": "Math", "grade": "Class 5", "expect": ["Basic Shapes and Geometry"] },
+    { "id": "geo-para", "kind": "paraphrase", "topic": "finding circles and rectangles around the house", "subject": "Math", "grade": "Class 5", "expect": ["Basic Shapes and Geometry"] },
+    { "id": "geo-lex", "kind": "lexical", "topic": "perimeter and area", "subject": "Math", "grade": "Class 5", "expect": ["Basic Shapes and Geometry"] },
+
+    { "id": "phon-direct", "kind": "direct", "topic": "phonics", "subject": "English", "grade": "Class 3", "expect": ["Phonics"] },
+    { "id": "phon-para", "kind": "paraphrase", "topic": "helping children read a new word by its letters", "subject": "English", "grade": "Class 3", "expect": ["Phonics"] },
+    { "id": "phon-lex", "kind": "lexical", "topic": "short vowel sounds and blending", "subject": "English", "grade": "Class 3", "expect": ["Phonics"] },
+
+    { "id": "read-direct", "kind": "direct", "topic": "reading comprehension", "subject": "English", "grade": "Class 5", "expect": ["Reading Comprehension"] },
+    { "id": "read-para", "kind": "paraphrase", "topic": "checking whether students understood a story", "subject": "English", "grade": "Class 5", "expect": ["Reading Comprehension"] },
+    { "id": "read-cross", "kind": "cross-grade", "topic": "story comprehension questions", "subject": "English", "grade": "Class 4", "expect": ["Reading Comprehension"] },
+
+    { "id": "water-direct", "kind": "direct", "topic": "the water cycle", "subject": "Science", "grade": "Class 4", "expect": ["Water Cycle"] },
+    { "id": "water-para", "kind": "paraphrase", "topic": "where rain comes from", "subject": "Science", "grade": "Class 4", "expect": ["Water Cycle"] },
+    { "id": "water-lex", "kind": "lexical", "topic": "evaporation and condensation", "subject": "Science", "grade": "Class 4", "expect": ["Water Cycle"] },
+
+    { "id": "photo-direct", "kind": "direct", "topic": "photosynthesis", "subject": "Science", "grade": "Class 5", "expect": ["Photosynthesis"] },
+    { "id": "photo-para", "kind": "paraphrase", "topic": "how plants make their own food from sunlight", "subject": "Science", "grade": "Class 5", "expect": ["Photosynthesis"] },
+    { "id": "photo-lex", "kind": "lexical", "topic": "chlorophyll", "subject": "Science", "grade": "Class 5", "expect": ["Photosynthesis"] },
+
+    { "id": "mixed-direct", "kind": "direct", "topic": "managing a mixed-age classroom", "subject": "General", "grade": "Class 3", "expect": ["Mixed-Age"] },
+    { "id": "mixed-para", "kind": "paraphrase", "topic": "keeping older and younger children busy at the same time", "subject": "General", "grade": "Class 4", "expect": ["Mixed-Age"] },
+
+    { "id": "neg-cricket", "kind": "negative", "topic": "rules of cricket", "subject": "Math", "grade": "Class 5", "expect": [] },
+    { "id": "neg-quadratic", "kind": "negative", "topic": "quadratic equations", "subject": "Math", "grade": "Class 5", "expect": [] },
+    { "id": "neg-electricity", "kind": "negative", "topic": "electric circuits and batteries", "subject": "Science", "grade": "Class 5", "expect": [] },
+    { "id": "neg-grammar", "kind": "negative", "topic": "past tense verbs", "subject": "English", "grade": "Class 4", "expect": [] },
+    { "id": "neg-hindi", "kind": "negative", "topic": "vilom shabd", "subject": "Hindi", "grade": "Class 4", "expect": [] }
+  ]
+}

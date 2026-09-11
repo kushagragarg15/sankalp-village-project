@@ -9,7 +9,7 @@ Two independent npm packages, no workspace/monorepo tooling:
 - `server/` — Express + Mongoose REST API (CommonJS, `require`). Entry: `server/server.js`.
 - `client/` — React 18 + Vite SPA (ESM, `"type": "module"`). Entry: `client/src/main.jsx`.
 
-There is **no build step, linter, or test suite** anywhere in this project. `npm test` is not defined; do not assume one exists. Verification is manual (run both servers, exercise the UI/API).
+There is **no build step, linter, or unit-test suite** in this project. `npm test` is not defined. Verification is manual (run both servers, exercise the UI/API) — except for the AI features, which have **evals**: `npm run eval:retrieval` and `npm run eval:generation` in `server/evals/` (see its README). Run the retrieval eval after any change to retrieval, chunking, thresholds or the embedding model.
 
 ## Commands
 
@@ -28,6 +28,8 @@ npm run seed-club-data         # rebuild a realistic term of weekend sessions, s
 npm run seed-resources         # load teaching resources + embeddings for RAG (needs an embedding provider key)
 npm run prep-next-session      # draft a session-prep plan for every volunteer registered for the
                                # next session (idempotent; pass a session id to target one)
+npm run eval:retrieval         # golden-set retrieval metrics, vector vs hybrid (see server/evals/README.md)
+npm run eval:generation        # lesson-plan quality: structure checks + LLM judge (2 model calls/query)
 npm run create-test-data       # create-test-volunteers + create-test-students (older, unrealistic)
 npm run create-test-volunteers
 npm run create-test-students
@@ -93,7 +95,9 @@ This is the only system. The legacy `Event` model, `eventController`, `routes/ev
 2. Build a grounded prompt from the retrieved chunks and call the OpenAI chat API.
 3. Response includes the generated plan **and** the source chunks with similarity scores (shown in the UI for transparency).
 
-`embeddingService.js` wraps OpenAI `text-embedding-3-small` and does word-count chunking with overlap. Embeddings are computed and stored at seed time by `scripts/seedResources.js` — the `Resource` model persists `chunks: [{ text, embedding: [Number] }]`. `RAG_NOTES.md` has the design rationale.
+`embeddingService.js` wraps the configured embedding model and does word-count chunking with overlap. Embeddings are computed and stored at seed time by `scripts/seedResources.js` — the `Resource` model persists `chunks: [{ text, embedding: [Number] }]` plus `embeddingModel`. `RAG_NOTES.md` has the design rationale.
+
+Retrieval has two modes (`RETRIEVAL_MODE`, default `vector`): `vector` ranks by cosine; `hybrid` adds BM25 (`services/lexicalSearch.js`, in-process over the pre-filtered chunks) fused by weighted Reciprocal Rank Fusion with a narrow keyword-rescue gate. **The default is vector because the eval shows the two tie on the current library** — do not switch without re-running `npm run eval:retrieval`. `retrieveContext` accepts `mode` and `queryEmbedding` overrides (the eval uses both). `generateLessonPlan` returns `contextChunks` (full passages) alongside `sources`; the API sends only `sources`. `RAG_QUIET=1` silences retrieval logging (the eval scripts set it).
 
 ### LLM provider layer — `server/services/llmClient.js`
 
@@ -110,6 +114,10 @@ Never `new OpenAI()` or `chat.completions.create()` anywhere else. `chatWithRetr
 5. Every run is persisted to `AgentRun` (question, answer, status, per-step tool/args/duration/ok/resultPreview, token usage, `durationMs` and `llmMs` = time waiting on the model) as an audit trail. The API response returns the steps *without* `resultPreview`; the client renders them as a collapsible trace under each answer.
 
 Tools must return small, JSON-serialisable objects — the model reads them verbatim, so shape them for a reader (names, not ObjectIds; percentages, not raw score pairs). **Shape tools around the questions people actually ask**: the first live run answered "what should I revise?" with 8 tool calls (one `get_student_progress` per child); adding a `myStudents` summary to `get_my_teaching_history` cut it to 1. Tool *descriptions* steer the model more reliably than system-prompt rules — but keep them literal; "do NOT call X for students listed by Y" made the model stop using X for a plainly named child. `AskSankalp.jsx` is the client page (`/ask`, both roles).
+
+### Evals — `server/evals/`
+
+`golden/retrieval.json` is the golden set (29 queries; `expect` = relevant resource title substrings, `kind` = direct/paraphrase/lexical/cross-grade/negative). `retrieval.js` scores precision@k, recall@k, MRR, hit@1, misses, and false-positive rate on negatives, per mode and per kind, and prints the delta vs the last saved run. `generation.js` runs the real planner on a slice, applies deterministic checks (sections, length, un-negated printed-materials mention) and an LLM judge (rubric → JSON → zod), and saves the same way. Both persist to `EvalRun`. Rules of thumb: the similarity threshold belongs to the embedding model (`llmClient.PROVIDERS[*].similarityThreshold`); treat judge deltas as the signal, not absolutes (self-judging is lenient); add golden queries when you add resources. The README in that folder says how to read the numbers.
 
 ### Session prep workflow — `server/services/sessionPrepService.js` + `prepController.js`
 

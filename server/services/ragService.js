@@ -1,6 +1,51 @@
 const { CHAT_MODEL, EMBEDDING_MODEL, SIMILARITY_THRESHOLD, chatWithRetry } = require('./llmClient');
 const Resource = require('../models/Resource');
 const { embedText } = require('./embeddingService');
+const { bm25Scores, reciprocalRankFusion } = require('./lexicalSearch');
+
+// 'vector' ranks by cosine similarity alone; 'hybrid' fuses cosine and BM25
+// rankings with RRF. Default is vector because `npm run eval:retrieval` shows
+// the two tie on the current library (29 golden queries, 2026-09) and vector is
+// the simpler one. Re-run the eval when the library grows or gains jargon the
+// embeddings handle badly; hybrid is a one-line switch. See evals/README.md.
+const RETRIEVAL_MODE = (process.env.RETRIEVAL_MODE || 'vector').toLowerCase();
+
+// Retrieval is chatty by default (useful when debugging a single request);
+// the eval harness runs it dozens of times and turns this off.
+const log = (...args) => {
+  if (process.env.RAG_QUIET !== '1') console.log(...args);
+};
+
+/**
+ * Hybrid ranking: fuse the cosine ranking and the BM25 ranking with RRF, then
+ * gate. A chunk is kept if it clears the semantic threshold, OR it is a strong
+ * keyword match (at least half the best BM25 score) that is only a little
+ * below the threshold. The second clause is what rescues exact-term queries
+ * ("vilom shabd", "BODMAS") whose embeddings drift; the cosine floor on it is
+ * what stops a shared common word from dragging in an unrelated chunk. The
+ * floor is tight (0.04) because the eval showed BM25 on a small corpus can
+ * rank a stray word ("rain" in the photosynthesis guide) above the real hit.
+ */
+function rankHybrid(scored, minSimilarity) {
+  const byVector = scored.map((_, i) => i).sort((a, b) => scored[b].similarity - scored[a].similarity);
+  const byLexical = scored
+    .map((_, i) => i)
+    .filter((i) => scored[i].lexical > 0)
+    .sort((a, b) => scored[b].lexical - scored[a].lexical);
+  // Semantic ranking counts double: keywords are there to rescue exact terms
+  // the embedding drifted on, not to outvote meaning.
+  const fused = reciprocalRankFusion([byVector, byLexical], scored.length, 60, [1, 0.5]);
+  const maxLexical = Math.max(0, ...scored.map((c) => c.lexical));
+
+  return scored
+    .map((c, i) => ({ ...c, score: fused[i] }))
+    .filter(
+      (c) =>
+        c.similarity >= minSimilarity ||
+        (maxLexical > 0 && c.lexical >= 0.5 * maxLexical && c.similarity >= minSimilarity - 0.04)
+    )
+    .sort((a, b) => b.score - a.score);
+}
 
 /**
  * Calculate cosine similarity between two vectors.
@@ -57,7 +102,17 @@ function nearbyGradePatterns(grade) {
  *   embedding model's SIMILARITY_THRESHOLD from llmClient)
  * @returns {Promise<Array<{text: string, similarity: number, source: object}>>}
  */
-async function retrieveContext({ topic, subject, grade, k = 5, minSimilarity = SIMILARITY_THRESHOLD }) {
+async function retrieveContext({
+  topic,
+  subject,
+  grade,
+  k = 5,
+  minSimilarity = SIMILARITY_THRESHOLD,
+  mode = RETRIEVAL_MODE,
+  // Callers that already hold the query vector (the eval harness, which embeds
+  // each golden query once and ranks it several ways) can pass it in.
+  queryEmbedding = null
+}) {
   try {
     // Step 1: Metadata pre-filter - only get resources matching subject and grade
     // This prevents comparing irrelevant documents and is much faster than
@@ -79,13 +134,13 @@ async function retrieveContext({ topic, subject, grade, k = 5, minSimilarity = S
     }).select('title subject grade chunks');
 
     if (matchingResources.length === 0) {
-      console.log(`No resources found for subject: ${subject}, grade: ${grade}`);
+      log(`No resources found for subject: ${subject}, grade: ${grade}`);
       return [];
     }
 
     // Step 2: Build query string and generate its embedding
     const queryText = `${topic} ${subject} ${grade}`;
-    const queryEmbedding = await embedText(queryText);
+    if (!queryEmbedding) queryEmbedding = await embedText(queryText);
 
     // Step 3: Collect all candidate chunks from matching resources
     const candidates = [];
@@ -103,23 +158,28 @@ async function retrieveContext({ topic, subject, grade, k = 5, minSimilarity = S
       }
     }
 
-    console.log(`Found ${candidates.length} candidate chunks after metadata filtering`);
+    log(`Found ${candidates.length} candidate chunks after metadata filtering`);
 
-    // Step 4: Score all candidates with cosine similarity
-    const scoredCandidates = candidates.map(candidate => ({
+    // Step 4: Score all candidates with cosine similarity (and, in hybrid
+    // mode, BM25 on the topic words)
+    const lexical = mode === 'hybrid' ? bm25Scores(topic, candidates.map((c) => c.text)) : null;
+    const scoredCandidates = candidates.map((candidate, i) => ({
       text: candidate.text,
       similarity: cosineSimilarity(queryEmbedding, candidate.embedding),
+      lexical: lexical ? lexical[i] : 0,
       source: candidate.source
     }));
 
-    // Step 5: Sort by similarity (descending) and filter by threshold
-    const topChunks = scoredCandidates
-      .filter(c => c.similarity >= minSimilarity)
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, k);
+    // Step 5: Rank, gate, and cut to k
+    const topChunks = (mode === 'hybrid'
+      ? rankHybrid(scoredCandidates, minSimilarity)
+      : scoredCandidates
+          .filter((c) => c.similarity >= minSimilarity)
+          .sort((a, b) => b.similarity - a.similarity)
+    ).slice(0, k);
 
-    console.log(`Returning ${topChunks.length} chunks (threshold: ${minSimilarity}, k: ${k})`);
-    
+    log(`Returning ${topChunks.length} chunks (mode: ${mode}, threshold: ${minSimilarity}, k: ${k})`);
+
     return topChunks;
   } catch (error) {
     console.error('Error in retrieveContext:', error);
@@ -161,7 +221,7 @@ async function generateLessonPlan({ topic, subject, grade, extraInstructions = '
       contextSection = '\n\nNote: No specific teaching resources found for this exact topic. Generate from general teaching knowledge.\n\n';
     }
 
-    const systemMessage = `You are an experienced teacher helping volunteers plan lessons for rural classrooms with limited materials. Use the provided teaching resources to ground your lesson plan in proven teaching strategies.`;
+    const systemMessage = `You are an experienced teacher helping volunteers plan lessons for a one-room village classroom. Assume there are NO printed materials of any kind — no worksheets, printouts, photocopies or printed copies of texts — only chalk, a board, and everyday objects (stones, sticks, rotis, leaves). If a text is needed, the volunteer reads it aloud or writes it on the board. Use the provided teaching resources to ground your lesson plan in proven teaching strategies.`;
 
     const userPrompt = `${contextSection}
 Based on the teaching resources above, create a structured lesson plan for:
@@ -202,7 +262,11 @@ Format the response in a clear, structured way that a volunteer can easily follo
 
     return {
       lessonPlan,
-      sources
+      sources,
+      // Full retrieved passages, for callers that need to check the plan
+      // against what it was grounded in (the generation eval). The API layer
+      // sends only `sources`.
+      contextChunks: retrievedChunks.map((c) => ({ title: c.source.title, text: c.text }))
     };
   } catch (error) {
     console.error('Error generating lesson plan:', error);
@@ -222,5 +286,6 @@ Format the response in a clear, structured way that a volunteer can easily follo
 module.exports = {
   cosineSimilarity,
   retrieveContext,
-  generateLessonPlan
+  generateLessonPlan,
+  RETRIEVAL_MODE
 };

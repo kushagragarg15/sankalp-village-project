@@ -71,21 +71,26 @@ This feature implements a "vanilla" RAG pipeline: **chunk → embed → retrieve
 
 **Metadata Pre-Filtering**: Narrowing the candidate set by structured attributes (subject, grade) before semantic search. Critical for performance and relevance—prevents full collection scans and irrelevant comparisons. Production systems do this before ANN index queries.
 
-## What Would a Production System Add?
+## What Has Been Added Since (2026-09)
 
-This project implements a complete, explainable RAG pipeline suitable for demonstration and interviews. A production deployment would add:
+- **Provider-agnostic LLM layer** (`services/llmClient.js`): chat and embeddings chosen by env var (Groq / Gemini / OpenAI) through OpenAI-compatible endpoints; embeddings stamped with their model so vectors from different models are never compared.
+- **Hybrid search** (`services/lexicalSearch.js`): BM25 over the pre-filtered chunks, fused with vector ranking by weighted RRF. Available via `RETRIEVAL_MODE=hybrid`; not the default, because the evals show no gain on this library.
+- **Evals** (`evals/`): golden set + retrieval metrics (precision/recall@k, MRR, hit@1, false positives) and generation metrics (structure checks + LLM judge). Runs persisted and diffed. The threshold in the section above (0.75) is the OpenAI-era value; for Gemini embeddings it is 0.62, and the eval is what established that.
+- **RAG as an agent tool** and **as a workflow step**: see `services/agentTools.js` and `services/sessionPrepService.js`.
+
+## What Would a Production System Still Add?
+
+A production deployment would add:
 
 1. **Vector Database / ANN Index**: Use Pinecone, Weaviate, or MongoDB Atlas Vector Search for efficient similarity search at scale. Our current in-memory cosine similarity works for small datasets (~10-100 resources) but doesn't scale to thousands.
 
-2. **Hybrid Search**: Combine semantic search (embeddings) with keyword-based search (BM25). Catches cases where semantic similarity misses exact term matches.
+2. **Reranking**: After initial retrieval, use a cross-encoder model to rerank results. More computationally expensive but significantly improves relevance at the top positions.
 
-3. **Reranking**: After initial retrieval, use a cross-encoder model to rerank results. More computationally expensive but significantly improves relevance at the top positions.
+3. **A bigger, human-labelled eval set** with inter-annotator agreement, and a judge model that is not the generator.
 
-4. **Evaluation & Metrics**: Track retrieval quality (precision@k, recall@k, MRR) and generation quality (human feedback, RAGAS metrics). Tune thresholds and k based on real performance data.
+4. **Caching & Rate Limiting**: Cache embeddings for common queries; per-user budgets on top of the retry/backoff that exists now.
 
-5. **Caching & Rate Limiting**: Cache embeddings for common queries, implement retry logic and rate limiting for OpenAI API calls.
-
-6. **Streaming Responses**: Stream generated text to the frontend for better UX on long generations.
+5. **Streaming Responses**: Stream generated text to the frontend for better UX on long generations.
 
 These are all legitimate production concerns, deliberately out of scope here—this is a student project optimized for clarity and interview discussion, not a research system.
 

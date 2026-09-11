@@ -205,6 +205,15 @@ Beyond single-shot RAG, the platform includes an **agent** that answers free-for
 
 Implementation: `server/services/agentService.js` (loop), `server/services/agentTools.js` (registry), `client/src/pages/AskSankalp.jsx`.
 
+## Evals — Measuring the AI Instead of Eyeballing It
+
+`server/evals/` holds a 29-query golden set over the resource library and two harnesses:
+
+- `npm run eval:retrieval` — precision@k, recall@k, MRR, hit@1 and false-positive rate on negatives, broken down by query type (direct / paraphrase / exact-term / cross-grade / negative), comparing plain vector search with hybrid (BM25 + vector, Reciprocal Rank Fusion) side by side
+- `npm run eval:generation` — runs the real lesson planner and grades each plan with deterministic checks (structure, no un-negated printed materials) plus an LLM judge scoring faithfulness to sources, grade fit, low-resource feasibility and completeness
+
+Every run is saved and diffed against the last, so a change to chunking, thresholds, prompts or the embedding model is judged by numbers. Findings so far: the similarity threshold is a property of the embedding model (0.75 tuned for OpenAI gave 21% recall on Gemini; 0.62 gives 100% with zero false positives); hybrid search ties vector on this library, so vector stays the default; and the judge caught a plan that asked for "one printed copy of the story", which led to a prompt fix. See `server/evals/README.md`.
+
 ## Session Prep — Workflow + Human-in-the-Loop
 
 Where the agent lets the model choose its steps, session prep is a **fixed workflow**: the task is identical every weekend, so the steps are code and the model is only asked to judge.

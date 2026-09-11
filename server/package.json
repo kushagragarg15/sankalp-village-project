@@ -17,7 +17,9 @@
     "update-user-role": "node scripts/updateUserRole.js",
     "update-all-roles": "node scripts/updateAllUserRoles.js",
     "seed-club-data": "node scripts/seedClubData.js",
-    "prep-next-session": "node scripts/prepNextSession.js"
+    "prep-next-session": "node scripts/prepNextSession.js",
+    "eval:retrieval": "cross-env RAG_QUIET=1 node evals/retrieval.js",
+    "eval:generation": "cross-env RAG_QUIET=1 node evals/generation.js"
   },
   "keywords": [
     "education",
@@ -40,6 +42,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "cross-env": "^10.1.0",
     "nodemon": "^3.1.0"
   }
 }
