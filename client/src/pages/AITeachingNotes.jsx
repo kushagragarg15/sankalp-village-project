@@ -3,6 +3,7 @@ import api from '../utils/api';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import Button from '../components/Button';
+import Prose from '../components/Prose';
 import Input, { Select, Textarea } from '../components/Input';
 import { useToast } from '../context/ToastContext';
 
@@ -197,9 +198,7 @@ export default function AITeachingNotes() {
               )}
 
               <div className="px-5 py-5">
-                <div className="whitespace-pre-wrap text-[15px] leading-relaxed text-ink max-w-[70ch]">
-                  {plan.notes}
-                </div>
+                <Prose text={plan.notes} className="max-w-[70ch]" />
               </div>
 
               <footer className="border-t border-rule px-5 py-3">

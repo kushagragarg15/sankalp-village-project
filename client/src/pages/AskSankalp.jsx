@@ -3,6 +3,7 @@ import { aiAPI } from '../utils/api';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import Button from '../components/Button';
+import Prose from '../components/Prose';
 import { useAuth } from '../context/AuthContext';
 
 // Openers that show off what the agent can reach, chosen per role so a
@@ -121,8 +122,11 @@ export default function AskSankalp() {
 
   const prompts = isAdmin ? ADMIN_PROMPTS : VOLUNTEER_PROMPTS;
 
+  // Smooth scrolling is for a new message landing. While an answer streams,
+  // this fires on every token, and dozens of overlapping smooth scrolls make
+  // the page crawl — so jump instantly until the stream is done.
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    endRef.current?.scrollIntoView({ behavior: loading ? 'auto' : 'smooth', block: 'end' });
   }, [messages, loading, live.text, live.status]);
 
   const ask = async (text) => {
@@ -250,9 +254,7 @@ export default function AskSankalp() {
             ) : (
               <li key={i} className="animate-lift-in">
                 <article className="rounded-lg border border-rule bg-surface px-4 py-3.5">
-                  <div className="whitespace-pre-wrap text-[15px] leading-relaxed text-ink">
-                    {m.content}
-                  </div>
+                  <Prose text={m.content} />
                   {m.trace && <Trace {...m.trace} />}
                 </article>
               </li>
@@ -263,8 +265,8 @@ export default function AskSankalp() {
             <li>
               <div className="rounded-lg border border-rule bg-surface px-4 py-3.5">
                 {live.text ? (
-                  <div className="whitespace-pre-wrap text-[15px] leading-relaxed text-ink">
-                    {live.text}
+                  <div>
+                    <Prose text={live.text} />
                     <span aria-hidden="true" className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[2px] bg-board animate-rule-pulse" />
                   </div>
                 ) : (
@@ -284,7 +286,8 @@ export default function AskSankalp() {
             </li>
           )}
         </ol>
-        <div ref={endRef} />
+        {/* Tall enough that scrolling it into view leaves the last message clear of the sticky form. */}
+        <div ref={endRef} className="h-28 sm:h-24" aria-hidden="true" />
 
         {error && (
           <div role="alert" className="mt-4 rounded-md border border-brick-line bg-brick-wash px-3.5 py-3">
@@ -294,7 +297,7 @@ export default function AskSankalp() {
 
         <form
           onSubmit={onSubmit}
-          className="sticky bottom-0 mt-6 -mx-4 border-t border-rule bg-paper px-4 pb-4 pt-3 sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0"
+          className="sticky bottom-0 -mx-4 -mt-24 border-t border-rule bg-paper px-4 pb-4 pt-3 sm:mx-0 sm:-mt-20 sm:border-0 sm:pb-4 sm:pt-3"
         >
           <div className="flex items-end gap-2 rounded-lg border border-rule-strong bg-surface p-1.5 focus-within:border-board">
             <textarea

@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import Button from '../components/Button';
+import Prose from '../components/Prose';
 import Badge from '../components/Badge';
 import LoadingState from '../components/LoadingState';
 import { Textarea } from '../components/Input';
@@ -156,7 +157,7 @@ function Section({ label, hint, editing, value, rows, onChange, render }) {
       ) : render ? (
         render(value)
       ) : (
-        <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-ink">{value}</p>
+        <Prose text={value} />
       )}
     </div>
   );

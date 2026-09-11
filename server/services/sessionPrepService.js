@@ -203,6 +203,10 @@ async function writeBlocks(groups, usage) {
   const { blocks } = await askForJson({ system: writeSystem, user, schema: BlocksSchema, usage, label: 'write' });
   const byIndex = new Map(blocks.map((b) => [b.index, b]));
 
+  // Models sometimes double-escape line breaks inside JSON strings, so the
+  // stored text would contain a literal backslash-n. Normalise once, here.
+  const unescape = (s) => (typeof s === 'string' ? s.replace(/\\n/g, '\n').trim() : s);
+
   return groups.map((g, index) => {
     const b = byIndex.get(index);
     return {
@@ -211,9 +215,9 @@ async function writeBlocks(groups, usage) {
       topic: g.topic,
       rationale: g.rationale,
       students: g.students,
-      objective: b?.objective || '',
-      activity: b?.activity || '',
-      checkQuestions: b?.checkQuestions || [],
+      objective: unescape(b?.objective) || '',
+      activity: unescape(b?.activity) || '',
+      checkQuestions: (b?.checkQuestions || []).map(unescape),
       sources: g.sources
     };
   });
