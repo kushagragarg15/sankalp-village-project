@@ -17,7 +17,6 @@ const bcrypt = require('bcryptjs');
 
 const User = require('../models/User');
 const Student = require('../models/Student');
-const Event = require('../models/Event');
 const AttendanceSession = require('../models/AttendanceSession');
 const Registration = require('../models/Registration');
 const TeachingLog = require('../models/TeachingLog');
@@ -198,7 +197,6 @@ async function seed() {
     AttendanceSession.deleteMany({}),
     Registration.deleteMany({}),
     TeachingLog.deleteMany({}),
-    Event.deleteMany({}),
   ]);
 
   console.log(`Cleared demo data. Removed ${removedUsers.deletedCount} seeded accounts.`);

@@ -74,7 +74,7 @@ The Vite dev server proxies `/api` -> `http://localhost:5000`, so the client wor
 
 ### Attendance system (the core domain) — `AttendanceSession` → `Registration` → `TeachingLog`
 
-This is the current system. `Event` / `eventController` / `routes/events.js` and `volunteerAttendanceController` / `routes/volunteerAttendance.js` are **legacy** and still mounted in `server.js`; new work targets the attendance-session models. See `EVENTS_VS_ATTENDANCE_SESSIONS.md`.
+This is the only system. The legacy `Event` model, `eventController`, `routes/events.js`, and the three orphaned pages that called it (`CheckIn.jsx`, `LogSession.jsx`, `MyAttendance.jsx`) were removed — nothing in the app linked to them, and they duplicated what `AttendanceSession`/`Registration`/`TeachingLog` already do. `volunteerAttendanceController` / `routes/volunteer-attendance` is **not** legacy — it aggregates from `TeachingLog` for the leaderboard and `MyAttendanceNew.jsx`, and is part of the current system despite the similar name. `EVENTS_VS_ATTENDANCE_SESSIONS.md`, if still present locally, now only describes history.
 
 1. Admin creates an `AttendanceSession` (title, `startTime`, `endTime`, `location {lat,lng}`).
 2. `GET /api/attendance-sessions` lazily generates/rotates a 5-char `activeCode` (10-min `codeExpiry`) for sessions that are currently active — code generation is a side effect of the list controller, not a cron job. Client polls (~30s) to display it.
@@ -107,7 +107,8 @@ This is the current system. `Event` / `eventController` / `routes/events.js` and
 ## Conventions & gotchas
 
 - Model files are singular PascalCase; the RAG collection model is `Resource` (`server/models/Resource.js`), not `TeachingResource`.
-- `client/src/pages/` contains near-duplicate WIP variants (`MyAttendance.jsx` vs `MyAttendanceNew.jsx`, `AttendancePage.jsx`, `VolunteerSessions.jsx`); check `App.jsx` to see which is actually routed before editing.
+- The old WIP duplicates (`CheckIn.jsx`, `LogSession.jsx`, the original `MyAttendance.jsx`) were removed as unreachable dead code — `MyAttendanceNew.jsx` is the only "my attendance" page now, and there's no `/checkin` or `/log-session` route. `AttendancePage.jsx` (submit flow) and `VolunteerSessions.jsx` (register/list flow) are both current, not duplicates of each other.
 - Attendance submit payload uses snake_case keys (`session_id`, `student_id`) even though the rest of the codebase is camelCase.
+- `npm run seed-club-data` and `npm run clear-data` both call `deleteMany` **at module load**, not behind `require.main === module` — `require()`-ing either file (e.g. to sanity-check an import graph) executes the wipe immediately. Run them only via `node scripts/<name>.js` or `npm run <script>`, never `require()`.
 - `BACKEND_FLOW_DOCUMENTATION.md`, `EVENTS_VS_ATTENDANCE_SESSIONS.md`, `PROJECT_PROPOSAL.md`, `INTERVIEW_PREP_GUIDE.md`, `PRESENTATION_IMAGES.md` and the `.tex` files are gitignored (kept local, not pushed) but are useful architecture references when present.
 - `.env.example` lives at the repo root; the file the server actually reads is `server/.env`.

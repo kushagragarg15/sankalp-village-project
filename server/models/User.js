@@ -36,20 +36,7 @@ const userSchema = new mongoose.Schema({
   phone: {
     type: String,
     default: ''
-  },
-  // Attendance tracking for volunteers
-  attendance: [{
-    event: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Event'
-    },
-    checkInTime: Date,
-    checkInMethod: {
-      type: String,
-      enum: ['qr', 'manual'],
-      default: 'qr'
-    }
-  }]
+  }
 }, {
   timestamps: true
 });

@@ -6,8 +6,8 @@ import { SessionsProvider } from './context/SessionsContext';
 import LoadingState from './components/LoadingState';
 
 // Login and the two screens a volunteer reaches first stay in the main bundle;
-// everything else is split out so the first paint does not carry recharts, the
-// QR scanner, and every admin screen along with it.
+// everything else is split out so the first paint does not carry recharts or
+// every admin screen along with it.
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import VolunteerSessions from './pages/VolunteerSessions';
@@ -15,9 +15,6 @@ import AttendancePage from './pages/AttendancePage';
 
 const Students = lazy(() => import('./pages/Students'));
 const StudentProgress = lazy(() => import('./pages/StudentProgress'));
-const CheckIn = lazy(() => import('./pages/CheckIn'));
-const LogSession = lazy(() => import('./pages/LogSession'));
-const MyAttendance = lazy(() => import('./pages/MyAttendance'));
 const MyAttendanceNew = lazy(() => import('./pages/MyAttendanceNew'));
 const Volunteers = lazy(() => import('./pages/Volunteers'));
 const Analytics = lazy(() => import('./pages/Analytics'));
@@ -44,9 +41,6 @@ function ProtectedRoute({ children, adminOnly = false }) {
 
 const routes = [
   { path: '/dashboard', element: <Dashboard /> },
-  { path: '/checkin', element: <CheckIn /> },
-  { path: '/log-session', element: <LogSession /> },
-  { path: '/my-attendance', element: <MyAttendance /> },
   { path: '/my-attendance-new', element: <MyAttendanceNew /> },
   { path: '/students', element: <Students /> },
   { path: '/students/:id', element: <StudentProgress /> },

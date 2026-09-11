@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const Student = require('../models/Student');
-const Event = require('../models/Event');
 const AttendanceSession = require('../models/AttendanceSession');
 const Registration = require('../models/Registration');
 const TeachingLog = require('../models/TeachingLog');
@@ -18,9 +17,6 @@ const clearAllData = async () => {
 
     await Student.deleteMany({});
     console.log('✓ Cleared all students');
-
-    await Event.deleteMany({});
-    console.log('✓ Cleared all events');
 
     await AttendanceSession.deleteMany({});
     console.log('✓ Cleared all attendance sessions');
