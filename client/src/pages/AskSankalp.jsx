@@ -114,6 +114,8 @@ export default function AskSankalp() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // What is happening right now, while an answer streams in.
+  const [live, setLive] = useState({ text: '', status: '', steps: [] });
   const endRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -121,7 +123,7 @@ export default function AskSankalp() {
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages, loading]);
+  }, [messages, loading, live.text, live.status]);
 
   const ask = async (text) => {
     const question = text.trim();
@@ -133,11 +135,36 @@ export default function AskSankalp() {
     setError('');
     setLoading(true);
 
+    setLive({ text: '', status: 'Thinking', steps: [] });
+
     try {
       // Only the clean user/assistant transcript goes up; the server owns the
       // tool calls and re-runs them fresh for every question.
-      const { data } = await aiAPI.ask(next.map(({ role, content }) => ({ role, content })));
-      const result = data.data;
+      const transcript = next.map(({ role, content }) => ({ role, content }));
+
+      // Stream when we can — tool steps and the answer appear as they happen.
+      // If the stream endpoint is unreachable (an old server, a proxy that
+      // strips streams), fall back to the plain request; same answer, later.
+      let result;
+      try {
+        result = await aiAPI.askStream(transcript, (event) => {
+          if (event.type === 'token') {
+            setLive((l) => ({ ...l, text: l.text + event.text, status: '' }));
+          } else if (event.type === 'retract') {
+            setLive((l) => ({ ...l, text: '' }));
+          } else if (event.type === 'tool_start') {
+            setLive((l) => ({ ...l, status: TOOL_LABELS[event.tool] || event.tool, steps: [...l.steps, event.tool] }));
+          } else if (event.type === 'tool_end') {
+            setLive((l) => ({ ...l, status: 'Thinking' }));
+          }
+        });
+      } catch (streamErr) {
+        // A guardrail (429) or validation (400) is a real answer, not a
+        // transport problem — surface it rather than retrying without a stream.
+        if (streamErr.status) throw streamErr;
+        const { data } = await aiAPI.ask(transcript);
+        result = data.data;
+      }
       setMessages([
         ...next,
         {
@@ -153,12 +180,13 @@ export default function AskSankalp() {
         },
       ]);
     } catch (err) {
-      setError(err.response?.data?.message || 'That did not go through. Try again in a moment.');
+      setError(err.response?.data?.message || err.message || 'That did not go through. Try again in a moment.');
       // Leave the question in the box so it is not lost.
       setInput(question);
       setMessages(messages);
     } finally {
       setLoading(false);
+      setLive({ text: '', status: '', steps: [] });
       inputRef.current?.focus();
     }
   };
@@ -233,11 +261,25 @@ export default function AskSankalp() {
 
           {loading && (
             <li>
-              <div className="rounded-lg border border-rule bg-surface px-4 py-4">
-                <div className="h-[3px] w-28 overflow-hidden rounded-full bg-rule">
-                  <div className="h-full w-1/3 rounded-full bg-board animate-rule-pulse" />
-                </div>
-                <p className="mt-2.5 text-[13px] text-ink-2">Looking through the club's records</p>
+              <div className="rounded-lg border border-rule bg-surface px-4 py-3.5">
+                {live.text ? (
+                  <div className="whitespace-pre-wrap text-[15px] leading-relaxed text-ink">
+                    {live.text}
+                    <span aria-hidden="true" className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[2px] bg-board animate-rule-pulse" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="h-[3px] w-28 overflow-hidden rounded-full bg-rule">
+                      <div className="h-full w-1/3 rounded-full bg-board animate-rule-pulse" />
+                    </div>
+                    <p className="mt-2.5 text-[13px] text-ink-2" aria-live="polite">
+                      {live.status || 'Looking through the club\'s records'}
+                      {live.steps.length > 0 && (
+                        <span className="text-ink-3"> · {live.steps.length} {live.steps.length === 1 ? 'lookup' : 'lookups'} so far</span>
+                      )}
+                    </p>
+                  </>
+                )}
               </div>
             </li>
           )}

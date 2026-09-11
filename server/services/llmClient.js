@@ -159,6 +159,32 @@ async function chatWithRetry(params) {
   }
 }
 
+/**
+ * Streaming variant of chatWithRetry. Retries apply to *opening* the stream
+ * (that is where a 429 arrives); once chunks are flowing, a failure is the
+ * caller's to handle — half an answer cannot be retried transparently.
+ * Asks the provider to append usage to the final chunk so streamed calls are
+ * accounted for like the rest.
+ */
+async function chatStreamWithRetry(params) {
+  const openai = getClient();
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await openai.chat.completions.create({
+        ...params,
+        stream: true,
+        stream_options: { include_usage: true }
+      });
+    } catch (err) {
+      const retryable = err.status === 429 || (err.status >= 500 && err.status < 600);
+      if (!retryable || attempt >= RETRY_DELAYS_MS.length) throw err;
+      const delay = suggestedDelayMs(err) || RETRY_DELAYS_MS[attempt];
+      console.warn(`LLM ${err.status} (stream); retrying in ${delay}ms (attempt ${attempt + 1}/${RETRY_DELAYS_MS.length})`);
+      await sleep(delay);
+    }
+  }
+}
+
 /** SDK client for embeddings (ingest and retrieval). May be a different provider. */
 const getEmbeddingClient = () => clientFor(EMBEDDING_PROVIDER);
 
@@ -173,5 +199,6 @@ module.exports = {
   notConfiguredMessage,
   getClient,
   getEmbeddingClient,
-  chatWithRetry
+  chatWithRetry,
+  chatStreamWithRetry
 };

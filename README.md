@@ -10,6 +10,7 @@ Sankalp is a full-stack web application designed to coordinate weekend teaching 
 
 ### For Administrators
 - **Dashboard**: Real-time overview of volunteers, students, and events
+- **AI activity**: Every question the assistant was asked and what it looked up, per-person token spend against a daily budget, why volunteers rejected drafted plans, and eval trends
 - **Event Management**: Create and manage weekend learning sessions with QR code check-in
 - **Volunteer Management**: Track volunteer participation and attendance
 - **Student Management**: Maintain student profiles and monitor progress
@@ -21,7 +22,7 @@ Sankalp is a full-stack web application designed to coordinate weekend teaching 
 - **Attendance History**: View personal participation records
 - **Student Progress Tracking**: Monitor individual student development
 - **RAG-Powered Teaching Notes Generator**: Create structured lesson plans grounded in curated teaching resources using Retrieval-Augmented Generation (RAG)
-- **Ask Sankalp (AI agent)**: Ask questions in plain language — "what did I teach last time?", "which Class 4 students have we missed?" — answered by a tool-using agent over live club data, with a visible trace of every lookup it made
+- **Ask Sankalp (AI agent)**: Ask questions in plain language — "what did I teach last time?", "which Class 4 students have we missed?" — answered by a tool-using agent over live club data, streamed as it works, with a visible trace of every lookup it made
 - **Session prep (AI workflow with human sign-off)**: Before a session, a fixed pipeline reads which children you taught, what they scored and who has been missed, picks 2–3 focus groups, grounds each in the resource library and drafts a hands-on block per group. You edit, approve or reject — nothing is final until you say so
 
 ## Tech Stack
@@ -172,6 +173,8 @@ sankalps-village-project/
 
 ### AI
 - `POST /api/ai/ask` - Ask the tool-using agent (`{ messages: [{ role, content }] }`)
+- `POST /api/ai/ask/stream` - Same, as Server-Sent Events
+- `GET /api/ai/admin/activity`, `GET /api/ai/admin/runs/:id` - AI observability (Admin)
 - `POST /api/prep/sessions/:id` - Draft (or return) my prep plan for a session (`{ force? }`)
 - `GET /api/prep/sessions/:id`, `GET /api/prep/mine` - My plans
 - `PATCH /api/prep/:id`, `POST /api/prep/:id/approve`, `POST /api/prep/:id/reject` - Review a draft (owner only)
@@ -200,6 +203,9 @@ Beyond single-shot RAG, the platform includes an **agent** that answers free-for
 - **Role-scoped tools**: volunteers are never shown admin tools; the server re-checks every call before executing it
 - **Guardrails**: tool results are labelled as data (prompt-injection defence), per-tool timeouts, result truncation, transcript sanitising, no contact details ever reach the model
 - **Full trace**: every run is persisted (`AgentRun`) with tool calls, arguments, latency and token usage; the UI shows what was looked up under each answer
+- **Streamed**: tool steps and the answer arrive over Server-Sent Events as they happen; the plain endpoint remains as a fallback
+- **Guardrails**: per-user rate limit and a per-user daily token budget computed from the audit trail (429 with `Retry-After`; admins included — the provider quota is shared)
+- **Observable**: an admin page reads the same audit rows — recent questions with their tools, tool failure rates, spend by person, rejection reasons from session prep, and eval history
 - **Provider-agnostic**: chat and embeddings are routed through one `llmClient` layer; swapping Groq / Gemini / OpenAI is an env-var change. Embeddings are stamped with the model that produced them so vectors from different models are never compared
 - **Resilient**: `Retry-After`-aware backoff on rate limits, per-tool timeouts, graceful step-limit answers
 

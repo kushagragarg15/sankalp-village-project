@@ -4,6 +4,7 @@ const User = require('../models/User');
 const LessonPlanDraft = require('../models/LessonPlanDraft');
 const { prepareSession } = require('../services/sessionPrepService');
 const { isConfigured, notConfiguredMessage } = require('../services/llmClient');
+const { invalidateBudget } = require('../middleware/aiBudget');
 
 /**
  * Session prep: the workflow drafts, a person decides.
@@ -52,6 +53,7 @@ exports.prepareForSession = async (req, res, next) => {
       volunteer: req.user,
       force: Boolean(req.body?.force)
     });
+    if (created) invalidateBudget(req.user._id);
     const full = await populateDraft(LessonPlanDraft.findById(draft._id));
     res.status(created ? 201 : 200).json({ success: true, data: full });
   } catch (error) {

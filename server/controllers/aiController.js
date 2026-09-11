@@ -3,6 +3,7 @@ const { processResourceContent } = require('../services/embeddingService');
 const { generateLessonPlan } = require('../services/ragService');
 const { runAgent } = require('../services/agentService');
 const { isConfigured, notConfiguredMessage, EMBEDDING_MODEL } = require('../services/llmClient');
+const { invalidateBudget } = require('../middleware/aiBudget');
 
 // @desc    Generate teaching notes using RAG (Retrieval-Augmented Generation)
 // @route   POST /api/ai/generate-notes
@@ -167,6 +168,7 @@ exports.askAgent = async (req, res, next) => {
     }
 
     const result = await runAgent({ messages, user: req.user });
+    invalidateBudget(req.user._id);
 
     res.status(200).json({ success: true, data: result });
   } catch (error) {
@@ -188,5 +190,55 @@ exports.askAgent = async (req, res, next) => {
     }
 
     next(error);
+  }
+};
+
+// @desc    Ask the agent, streaming progress and the answer as Server-Sent Events
+// @route   POST /api/ai/ask/stream
+// @access  Private
+//
+// Events (one JSON object per `data:` line):
+//   { type: 'token', text }              a piece of the answer
+//   { type: 'retract' }                  discard the text so far (it was a tool turn)
+//   { type: 'tool_start' | 'tool_end' }  progress, for the "looking up…" line
+//   { type: 'done', ...result }          the same payload /ask returns
+//   { type: 'error', message }
+exports.askAgentStream = async (req, res, next) => {
+  const { messages } = req.body;
+  const last = Array.isArray(messages) && messages[messages.length - 1];
+  if (!last || last.role !== 'user' || typeof last.content !== 'string' || !last.content.trim()) {
+    return res.status(400).json({ success: false, message: 'The last message must be a non-empty user message' });
+  }
+  if (!isConfigured()) {
+    return res.status(503).json({ success: false, message: notConfiguredMessage() });
+  }
+
+  res.set({
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no' // tell nginx-style proxies not to buffer
+  });
+  res.flushHeaders();
+
+  let closed = false;
+  req.on('close', () => { closed = true; });
+  const send = (event) => {
+    if (!closed) res.write(`data: ${JSON.stringify(event)}\n\n`);
+  };
+
+  try {
+    const result = await runAgent({ messages, user: req.user, onEvent: send });
+    invalidateBudget(req.user._id);
+    send({ type: 'done', ...result });
+  } catch (error) {
+    console.error('Error in askAgentStream:', error);
+    const message =
+      error.status === 429 || /rate limit/i.test(error.message)
+        ? 'The AI provider is rate-limiting us right now. Try again in a minute.'
+        : 'That did not go through. Try again in a moment.';
+    send({ type: 'error', message });
+  } finally {
+    if (!closed) res.end();
   }
 };

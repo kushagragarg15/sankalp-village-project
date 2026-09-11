@@ -1,4 +1,4 @@
-const { CHAT_MODEL, chatWithRetry } = require('./llmClient');
+const { CHAT_MODEL, chatWithRetry, chatStreamWithRetry } = require('./llmClient');
 const AgentRun = require('../models/AgentRun');
 const { toolsForRole, toolSchemasForRole } = require('./agentTools');
 
@@ -38,7 +38,7 @@ const buildSystemPrompt = (user) => {
 
   return [
     `You are Sankalp's assistant. Sankalp is a student club that runs weekend teaching sessions for children in a village school. You are talking to ${user.name}, ${who}.`,
-    `Today is ${today}.`,
+    `Today is ${today}. Timestamps in tool results are UTC; the club is in India (IST, UTC+5:30) — always present dates and times in IST, e.g. "Sat 12 Sep, 10:00 to 13:00".`,
     '',
     'How to work:',
     '- Answer from the tools, not from memory. If a question needs club data, call a tool first. Never invent students, volunteers, sessions or scores.',
@@ -110,12 +110,59 @@ async function executeToolCall(call, allowedTools, ctx) {
 }
 
 /**
+ * One model turn, streamed. Forwards content tokens to onEvent as they
+ * arrive and reassembles tool calls from their deltas (the OpenAI stream
+ * format sends a tool call's name once and its JSON arguments in pieces,
+ * keyed by index). Returns the same shape as a non-streamed choice so the loop
+ * does not care which path produced it.
+ */
+async function streamTurn(params, onEvent) {
+  const stream = await chatStreamWithRetry(params);
+  let content = '';
+  let finishReason = null;
+  let usage = null;
+  const toolCalls = new Map(); // index -> { id, type, function: { name, arguments } }
+
+  for await (const chunk of stream) {
+    if (chunk.usage) usage = chunk.usage;
+    if (chunk.x_groq?.usage) usage = chunk.x_groq.usage;
+    const choice = chunk.choices?.[0];
+    if (!choice) continue;
+    if (choice.finish_reason) finishReason = choice.finish_reason;
+
+    const delta = choice.delta || {};
+    if (delta.content) {
+      content += delta.content;
+      onEvent({ type: 'token', text: delta.content });
+    }
+    for (const tc of delta.tool_calls || []) {
+      const slot = toolCalls.get(tc.index) || { id: '', type: 'function', function: { name: '', arguments: '' } };
+      if (tc.id) slot.id = tc.id;
+      if (tc.function?.name) slot.function.name += tc.function.name;
+      if (tc.function?.arguments) slot.function.arguments += tc.function.arguments;
+      toolCalls.set(tc.index, slot);
+    }
+  }
+
+  const calls = [...toolCalls.entries()].sort((a, b) => a[0] - b[0]).map(([, c]) => c);
+  const message = { role: 'assistant', content: content || null };
+  if (calls.length) message.tool_calls = calls;
+  return { message, finish_reason: finishReason, usage };
+}
+
+/**
  * @param {object} params
  * @param {Array<{role: string, content: string}>} params.messages - transcript, last item is the new question
  * @param {object} params.user - req.user
+ * @param {(event: object) => void} [params.onEvent] - when given, the run streams:
+ *   { type: 'token', text }            answer text as it is generated
+ *   { type: 'retract' }                the text so far was not the answer (a tool turn) — discard it
+ *   { type: 'tool_start', tool, args } a tool is about to run
+ *   { type: 'tool_end', tool, ok, durationMs, error? }
+ *   The final result is returned as usual; the caller decides how to send it.
  * @returns {Promise<{answer: string, steps: Array, iterations: number, usage: object, durationMs: number, status: string, runId: string}>}
  */
-async function runAgent({ messages, user }) {
+async function runAgent({ messages, user, onEvent = null }) {
   const started = Date.now();
   const history = sanitiseHistory(messages);
   const question = history[history.length - 1]?.content || '';
@@ -136,21 +183,28 @@ async function runAgent({ messages, user }) {
     while (iterations < MAX_ITERATIONS) {
       iterations += 1;
 
-      const llmStarted = Date.now();
-      const completion = await chatWithRetry({
+      const params = {
         model: MODEL,
         messages: transcript,
         tools: toolSchemas,
         tool_choice: 'auto',
         temperature: 0.2,
         max_tokens: MAX_OUTPUT_TOKENS
-      });
+      };
+
+      const llmStarted = Date.now();
+      let choice;
+      if (onEvent) {
+        choice = await streamTurn(params, onEvent);
+      } else {
+        const completion = await chatWithRetry(params);
+        choice = { message: completion.choices[0].message, finish_reason: completion.choices[0].finish_reason, usage: completion.usage };
+      }
 
       llmMs += Date.now() - llmStarted;
-      usage.promptTokens += completion.usage?.prompt_tokens || 0;
-      usage.completionTokens += completion.usage?.completion_tokens || 0;
+      usage.promptTokens += choice.usage?.prompt_tokens || 0;
+      usage.completionTokens += choice.usage?.completion_tokens || 0;
 
-      const choice = completion.choices[0];
       const message = choice.message;
       if (choice.finish_reason === 'length') {
         console.warn(`LLM output hit max_tokens (${MAX_OUTPUT_TOKENS}) on iteration ${iterations}`);
@@ -163,9 +217,25 @@ async function runAgent({ messages, user }) {
         break;
       }
 
+      // Any text streamed during a tool turn was narration, not the answer.
+      if (onEvent && message.content) onEvent({ type: 'retract' });
+
       // Independent calls in one turn run concurrently — the model batched them
       // because it needs all of them before it can continue.
+      if (onEvent) {
+        for (const call of calls) {
+          let args = null;
+          try { args = call.function.arguments ? JSON.parse(call.function.arguments) : {}; } catch { /* reported by executeToolCall */ }
+          onEvent({ type: 'tool_start', tool: call.function.name, args });
+        }
+      }
       const outcomes = await Promise.all(calls.map((call) => executeToolCall(call, allowedTools, ctx)));
+      if (onEvent) {
+        calls.forEach((call, i) => {
+          const o = outcomes[i];
+          onEvent({ type: 'tool_end', tool: call.function.name, ok: o.ok, durationMs: o.durationMs, error: o.ok ? undefined : o.error });
+        });
+      }
 
       calls.forEach((call, i) => {
         const outcome = outcomes[i];

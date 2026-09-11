@@ -84,7 +84,70 @@ export const userAPI = {
 export const aiAPI = {
   generateNotes: (data) => api.post('/ai/generate-notes', data),
   // messages: [{ role: 'user' | 'assistant', content }], last one is the new question
-  ask: (messages) => api.post('/ai/ask', { messages })
+  ask: (messages) => api.post('/ai/ask', { messages }),
+
+  /**
+   * Same as ask(), but streamed as Server-Sent Events so the page can show
+   * tool steps and the answer as they happen. Axios cannot read a stream, so
+   * this uses fetch with the same base URL, token and cookie the instance uses.
+   * Calls onEvent for every event; resolves with the 'done' payload; rejects
+   * on transport failure or an 'error' event.
+   */
+  askStream: async (messages, onEvent, { signal } = {}) => {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${api.defaults.baseURL}/ai/ask/stream`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ messages }),
+      signal
+    });
+
+    if (!response.ok) {
+      // Guardrails and validation answer with JSON before any stream starts.
+      let message = 'That did not go through. Try again in a moment.';
+      try { message = (await response.json()).message || message; } catch { /* keep default */ }
+      const err = new Error(message);
+      err.status = response.status;
+      err.retryAfter = Number(response.headers.get('Retry-After')) || null;
+      throw err;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let done = null;
+
+    for (;;) {
+      const { value, done: finished } = await reader.read();
+      if (finished) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      // Events are separated by a blank line; a chunk may end mid-event.
+      let split;
+      while ((split = buffer.indexOf('\n\n')) !== -1) {
+        const raw = buffer.slice(0, split).trim();
+        buffer = buffer.slice(split + 2);
+        if (!raw.startsWith('data:')) continue;
+        const event = JSON.parse(raw.slice(5));
+        if (event.type === 'error') throw new Error(event.message);
+        if (event.type === 'done') done = event;
+        onEvent(event);
+      }
+    }
+    if (!done) throw new Error('The connection closed before the answer finished.');
+    return done;
+  }
+};
+
+// Coordinator observability over the AI features
+export const aiAdminAPI = {
+  activity: () => api.get('/ai/admin/activity'),
+  run: (id) => api.get(`/ai/admin/runs/${id}`)
 };
 
 // Session prep: the workflow drafts a plan, the volunteer reviews it.

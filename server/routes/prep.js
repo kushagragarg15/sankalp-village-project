@@ -10,6 +10,7 @@ const {
   getAllForSession
 } = require('../controllers/prepController');
 const { protect, authorize } = require('../middleware/auth');
+const { aiRateLimit, aiDailyBudget } = require('../middleware/aiBudget');
 
 const router = express.Router();
 
@@ -23,7 +24,7 @@ router.route('/sessions/:sessionId/all')
 
 router.route('/sessions/:sessionId')
   .get(getMyPlanForSession)
-  .post(prepareForSession);
+  .post(aiRateLimit, aiDailyBudget, prepareForSession);
 
 router.get('/mine', getMyPlans);
 

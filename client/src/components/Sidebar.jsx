@@ -13,6 +13,7 @@ const adminLinks = [
   { path: '/analytics', label: 'Insights' },
   { path: '/ai-notes', label: 'Lesson planner' },
   { path: '/ask', label: 'Ask' },
+  { path: '/ai-activity', label: 'AI activity' },
 ];
 
 const volunteerLinks = [
