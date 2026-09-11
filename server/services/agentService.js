@@ -1,4 +1,4 @@
-const { getClient, CHAT_MODEL } = require('./llmClient');
+const { CHAT_MODEL, chatWithRetry } = require('./llmClient');
 const AgentRun = require('../models/AgentRun');
 const { toolsForRole, toolSchemasForRole } = require('./agentTools');
 
@@ -29,9 +29,6 @@ const MAX_MESSAGE_CHARS = 2000;
 // and the OpenAI-compatible endpoints count both against max_tokens. Too small
 // a cap truncates the answer mid-sentence.
 const MAX_OUTPUT_TOKENS = 4000;
-// Free-tier providers rate-limit per minute; the SDK's own backoff (max ~8s)
-// gives up long before the window resets.
-const RETRY_DELAYS_MS = [2000, 5000, 12000, 25000];
 
 const buildSystemPrompt = (user) => {
   const today = new Date().toLocaleDateString('en-IN', {
@@ -76,29 +73,6 @@ const withTimeout = (promise, ms, label) =>
   ]);
 
 const truncate = (s, n) => (s.length > n ? `${s.slice(0, n)}\n…[truncated ${s.length - n} chars]` : s);
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-/**
- * Retry the model call on 429 (rate limit) and 5xx (provider hiccup), honouring
- * Retry-After when the provider sends one. Anything else — a bad key, a bad
- * request — is not going to get better by waiting, so it is thrown at once.
- */
-async function createCompletionWithRetry(openai, params) {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      return await openai.chat.completions.create(params);
-    } catch (err) {
-      const retryable = err.status === 429 || (err.status >= 500 && err.status < 600);
-      if (!retryable || attempt >= RETRY_DELAYS_MS.length) throw err;
-
-      const retryAfterSec = Number(err.headers?.['retry-after']);
-      const delay = retryAfterSec > 0 ? retryAfterSec * 1000 : RETRY_DELAYS_MS[attempt];
-      console.warn(`LLM ${err.status}; retrying in ${delay}ms (attempt ${attempt + 1}/${RETRY_DELAYS_MS.length})`);
-      await sleep(delay);
-    }
-  }
-}
 
 /**
  * Run one tool call the model asked for.
@@ -158,14 +132,12 @@ async function runAgent({ messages, user }) {
   let answer = '';
   let status = 'completed';
 
-  const openai = getClient();
-
   try {
     while (iterations < MAX_ITERATIONS) {
       iterations += 1;
 
       const llmStarted = Date.now();
-      const completion = await createCompletionWithRetry(openai, {
+      const completion = await chatWithRetry({
         model: MODEL,
         messages: transcript,
         tools: toolSchemas,

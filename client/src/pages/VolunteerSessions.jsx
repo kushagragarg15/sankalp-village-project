@@ -113,16 +113,32 @@ export default function VolunteerSessions() {
                       {registering === session._id ? 'Registering' : 'Register'}
                     </Button>
                   ) : state === 'live' ? (
-                    <Button
-                      variant="live"
-                      onClick={() => navigate(`/attendance/${session._id}`)}
-                    >
-                      Record attendance
-                    </Button>
+                    <>
+                      <Button
+                        variant="live"
+                        onClick={() => navigate(`/attendance/${session._id}`)}
+                      >
+                        Record attendance
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => navigate(`/prep/${session._id}`)}
+                      >
+                        My plan
+                      </Button>
+                    </>
                   ) : (
-                    <span className="text-[13px] text-ink-2 self-center">
-                      You are on the list
-                    </span>
+                    <>
+                      <span className="text-[13px] text-ink-2 self-center">
+                        You are on the list
+                      </span>
+                      <Button
+                        variant="secondary"
+                        onClick={() => navigate(`/prep/${session._id}`)}
+                      >
+                        Prepare
+                      </Button>
+                    </>
                   )
                 }
               />

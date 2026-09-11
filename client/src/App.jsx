@@ -20,6 +20,7 @@ const Volunteers = lazy(() => import('./pages/Volunteers'));
 const Analytics = lazy(() => import('./pages/Analytics'));
 const AITeachingNotes = lazy(() => import('./pages/AITeachingNotes'));
 const AskSankalp = lazy(() => import('./pages/AskSankalp'));
+const SessionPrep = lazy(() => import('./pages/SessionPrep'));
 const AdminSessions = lazy(() => import('./pages/AdminSessions'));
 const AttendanceReport = lazy(() => import('./pages/AttendanceReport'));
 
@@ -49,6 +50,7 @@ const routes = [
   { path: '/analytics', element: <Analytics /> },
   { path: '/ai-notes', element: <AITeachingNotes /> },
   { path: '/ask', element: <AskSankalp /> },
+  { path: '/prep/:sessionId', element: <SessionPrep /> },
   { path: '/admin-sessions', element: <AdminSessions />, adminOnly: true },
   { path: '/volunteer-sessions', element: <VolunteerSessions /> },
   { path: '/attendance/:sessionId', element: <AttendancePage /> },

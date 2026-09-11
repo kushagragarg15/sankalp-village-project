@@ -123,6 +123,42 @@ const notConfiguredMessage = () => {
 /** SDK client for chat completions (the agent and the lesson planner). */
 const getClient = () => clientFor(CHAT_PROVIDER);
 
+// Free-tier providers rate-limit per minute; the SDK's own backoff (max ~8s)
+// gives up long before the window resets, so clients are built with
+// maxRetries 0 and this is the one retry path for every chat call.
+const RETRY_DELAYS_MS = [2000, 5000, 12000, 25000];
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// How long the provider asked us to wait, if it said. Groq puts it in the
+// message ("Please try again in 11.2s"), others in a Retry-After header.
+const suggestedDelayMs = (err) => {
+  const header = Number(err.headers?.['retry-after']);
+  if (header > 0) return header * 1000;
+  const m = /try again in ([\d.]+)\s*s/i.exec(err.message || '');
+  if (m) return Math.ceil(Number(m[1]) * 1000) + 500;
+  return null;
+};
+
+/**
+ * chat.completions.create with retry on 429 (rate limit) and 5xx (provider
+ * hiccup). Anything else — a bad key, a bad request — will not get better by
+ * waiting and is thrown at once.
+ */
+async function chatWithRetry(params) {
+  const openai = getClient();
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await openai.chat.completions.create(params);
+    } catch (err) {
+      const retryable = err.status === 429 || (err.status >= 500 && err.status < 600);
+      if (!retryable || attempt >= RETRY_DELAYS_MS.length) throw err;
+      const delay = suggestedDelayMs(err) || RETRY_DELAYS_MS[attempt];
+      console.warn(`LLM ${err.status}; retrying in ${delay}ms (attempt ${attempt + 1}/${RETRY_DELAYS_MS.length})`);
+      await sleep(delay);
+    }
+  }
+}
+
 /** SDK client for embeddings (ingest and retrieval). May be a different provider. */
 const getEmbeddingClient = () => clientFor(EMBEDDING_PROVIDER);
 
@@ -136,5 +172,6 @@ module.exports = {
   isConfigured,
   notConfiguredMessage,
   getClient,
-  getEmbeddingClient
+  getEmbeddingClient,
+  chatWithRetry
 };

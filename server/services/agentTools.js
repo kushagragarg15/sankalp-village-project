@@ -503,4 +503,4 @@ const toolSchemasForRole = (role) =>
     function: { name: t.name, description: t.description, parameters: t.parameters }
   }));
 
-module.exports = { tools, toolsForRole, toolSchemasForRole };
+module.exports = { tools, toolsForRole, toolSchemasForRole, normaliseSubject };

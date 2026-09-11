@@ -25,7 +25,9 @@ npm run seed-club-data         # rebuild a realistic term of weekend sessions, s
                                # teaching logs (Aug 2026 -> today). PRESERVES accounts that
                                # have a googleId; deletes every other user plus all students,
                                # sessions, registrations, teaching logs and legacy events.
-npm run seed-resources         # load teaching resources + embeddings for RAG (needs OPENAI_API_KEY)
+npm run seed-resources         # load teaching resources + embeddings for RAG (needs an embedding provider key)
+npm run prep-next-session      # draft a session-prep plan for every volunteer registered for the
+                               # next session (idempotent; pass a session id to target one)
 npm run create-test-data       # create-test-volunteers + create-test-students (older, unrealistic)
 npm run create-test-volunteers
 npm run create-test-students
@@ -95,7 +97,7 @@ This is the only system. The legacy `Event` model, `eventController`, `routes/ev
 
 ### LLM provider layer — `server/services/llmClient.js`
 
-Never `new OpenAI()` anywhere else. `getClient()` is the chat client, `getEmbeddingClient()` the embedding client (they may be different providers), `CHAT_MODEL` / `EMBEDDING_MODEL` the model names. Clients are created with `maxRetries: 0` — the agent loop owns retries so every 429 is logged. **Embedding-space rule:** `Resource.embeddingModel` records which model produced a document's vectors; `retrieveContext` only reads resources whose `embeddingModel` matches the current `EMBEDDING_MODEL` (legacy docs with no field count as `text-embedding-3-small`), and `cosineSimilarity` returns -1 for mismatched lengths. Changing the embedding model means `npm run seed-resources` to re-embed, or retrieval silently finds nothing. Free-tier realities (2026-09): Gemini `gemini-3.5-flash` is 20 requests/day; Groq `openai/gpt-oss-120b` is ~8k tokens/minute (bursts of multi-step questions trigger 429s that the retry absorbs with `Retry-After`); the project's OpenAI account has no credits.
+Never `new OpenAI()` or `chat.completions.create()` anywhere else. `chatWithRetry(params)` is the one chat call path (429/5xx retried with `Retry-After` / Groq's "try again in Ns" honoured; clients are built with `maxRetries: 0` so the SDK never retries silently); `getEmbeddingClient()` is the embedding client (may be a different provider); `CHAT_MODEL` / `EMBEDDING_MODEL` / `SIMILARITY_THRESHOLD` are the per-provider constants. **Embedding-space rule:** `Resource.embeddingModel` records which model produced a document's vectors; `retrieveContext` only reads resources whose `embeddingModel` matches the current `EMBEDDING_MODEL` (legacy docs with no field count as `text-embedding-3-small`), and `cosineSimilarity` returns -1 for mismatched lengths. Changing the embedding model means `npm run seed-resources` to re-embed, or retrieval silently finds nothing. Free-tier realities (2026-09): Gemini `gemini-3.5-flash` is 20 requests/day; Groq `openai/gpt-oss-120b` is ~8k tokens/minute (bursts of multi-step questions trigger 429s that the retry absorbs with `Retry-After`); the project's OpenAI account has no credits.
 
 ### "Ask Sankalp" agent — `server/services/agentService.js` + `agentTools.js`
 
@@ -108,6 +110,22 @@ Never `new OpenAI()` anywhere else. `getClient()` is the chat client, `getEmbedd
 5. Every run is persisted to `AgentRun` (question, answer, status, per-step tool/args/duration/ok/resultPreview, token usage, `durationMs` and `llmMs` = time waiting on the model) as an audit trail. The API response returns the steps *without* `resultPreview`; the client renders them as a collapsible trace under each answer.
 
 Tools must return small, JSON-serialisable objects — the model reads them verbatim, so shape them for a reader (names, not ObjectIds; percentages, not raw score pairs). **Shape tools around the questions people actually ask**: the first live run answered "what should I revise?" with 8 tool calls (one `get_student_progress` per child); adding a `myStudents` summary to `get_my_teaching_history` cut it to 1. Tool *descriptions* steer the model more reliably than system-prompt rules — but keep them literal; "do NOT call X for students listed by Y" made the model stop using X for a plainly named child. `AskSankalp.jsx` is the client page (`/ask`, both roles).
+
+### Session prep workflow — `server/services/sessionPrepService.js` + `prepController.js`
+
+The deliberate counterpart to the agent: a **fixed workflow with two LLM steps and a human sign-off**, for a task that is the same every time.
+
+```
+gather (agent tools as plain functions) → plan (LLM, JSON, zod) → retrieve (RAG per group) → write (LLM, JSON, zod) → LessonPlanDraft(status: draft)
+                                                                                                  volunteer edits → approves | rejects (reason kept)
+```
+
+- `prepareSession({ session, volunteer, force })` is **idempotent**: an existing `draft`/`approved` plan is returned untouched; `force: true` marks it `superseded` and drafts afresh (history kept, never overwritten). A `rejected` plan does not block a new draft.
+- Model output is parsed with zod (`PlanSchema`, `BlocksSchema`); one retry with the validation error in the prompt. Student names the planner invents are dropped — a group with no real students is discarded, and if none survive the run fails rather than saving fiction. Names are resolved to `studentId`s after validation.
+- `gather` calls `get_my_teaching_history` and `find_students_needing_attention` from `agentTools` directly (`tool.run(args, { user })`). Same tools, deterministic orchestration.
+- Access (`prepController`): volunteers must be **registered** for a session that has **not ended**; only the **owner** can edit/approve/reject and only while `status === 'draft'` (409 otherwise). Admin `POST/GET /api/prep/sessions/:id/all` drafts for / lists all registered volunteers, but **cannot approve on a volunteer's behalf** — the person teaching signs off. Edits touch only `topic/objective/activity/checkQuestions`; `students`, `rationale`, `sources` stay as generated so the audit trail is honest (`editedByVolunteer` flag).
+- Each draft stores `trace` (per-step ms + detail), `usage`, `generatedBy`, `contextSummary`. ~10s and 2 model calls per volunteer on Groq. Batch is sequential on purpose (free-tier TPM).
+- Client: `SessionPrep.jsx` at `/prep/:sessionId` (reached from a "Prepare"/"My plan" button on registered sessions in `VolunteerSessions.jsx`).
 
 ### Backend request path
 

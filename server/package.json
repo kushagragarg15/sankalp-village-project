@@ -16,7 +16,8 @@
     "seed-resources": "node scripts/seedResources.js",
     "update-user-role": "node scripts/updateUserRole.js",
     "update-all-roles": "node scripts/updateAllUserRoles.js",
-    "seed-club-data": "node scripts/seedClubData.js"
+    "seed-club-data": "node scripts/seedClubData.js",
+    "prep-next-session": "node scripts/prepNextSession.js"
   },
   "keywords": [
     "education",
@@ -35,7 +36,8 @@
     "google-auth-library": "^11.0.2",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.3.2",
-    "openai": "^4.38.5"
+    "openai": "^4.38.5",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"

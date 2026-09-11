@@ -22,6 +22,7 @@ Sankalp is a full-stack web application designed to coordinate weekend teaching 
 - **Student Progress Tracking**: Monitor individual student development
 - **RAG-Powered Teaching Notes Generator**: Create structured lesson plans grounded in curated teaching resources using Retrieval-Augmented Generation (RAG)
 - **Ask Sankalp (AI agent)**: Ask questions in plain language — "what did I teach last time?", "which Class 4 students have we missed?" — answered by a tool-using agent over live club data, with a visible trace of every lookup it made
+- **Session prep (AI workflow with human sign-off)**: Before a session, a fixed pipeline reads which children you taught, what they scored and who has been missed, picks 2–3 focus groups, grounds each in the resource library and drafts a hands-on block per group. You edit, approve or reject — nothing is final until you say so
 
 ## Tech Stack
 
@@ -171,6 +172,10 @@ sankalps-village-project/
 
 ### AI
 - `POST /api/ai/ask` - Ask the tool-using agent (`{ messages: [{ role, content }] }`)
+- `POST /api/prep/sessions/:id` - Draft (or return) my prep plan for a session (`{ force? }`)
+- `GET /api/prep/sessions/:id`, `GET /api/prep/mine` - My plans
+- `PATCH /api/prep/:id`, `POST /api/prep/:id/approve`, `POST /api/prep/:id/reject` - Review a draft (owner only)
+- `POST/GET /api/prep/sessions/:id/all` - Draft for / list all registered volunteers (Admin)
 - `POST /api/ai/generate-notes` - Generate lesson plan using RAG
 - `GET /api/ai/resources` - List teaching resources
 - `POST /api/ai/resources` - Create teaching resource (Admin)
@@ -199,6 +204,22 @@ Beyond single-shot RAG, the platform includes an **agent** that answers free-for
 - **Resilient**: `Retry-After`-aware backoff on rate limits, per-tool timeouts, graceful step-limit answers
 
 Implementation: `server/services/agentService.js` (loop), `server/services/agentTools.js` (registry), `client/src/pages/AskSankalp.jsx`.
+
+## Session Prep — Workflow + Human-in-the-Loop
+
+Where the agent lets the model choose its steps, session prep is a **fixed workflow**: the task is identical every weekend, so the steps are code and the model is only asked to judge.
+
+```
+gather context → plan focus groups (LLM, JSON) → retrieve resources (RAG) → write blocks (LLM, JSON) → DRAFT
+                                                                         volunteer edits → approves / rejects
+```
+
+- **Structured outputs, validated**: every model reply is parsed against a zod schema; invented student names are dropped before anything is saved
+- **Human-in-the-loop**: a draft becomes a plan only when the volunteer who will teach it approves; rejections carry a reason, kept for improving the planner
+- **Idempotent and auditable**: re-running returns the existing draft; forcing a redraft supersedes rather than overwrites; each draft records its steps, timing and token usage
+- **Proactive**: `npm run prep-next-session` drafts for every registered volunteer of the next session — the job a scheduler runs on Friday night
+
+Implementation: `server/services/sessionPrepService.js`, `server/controllers/prepController.js`, `server/models/LessonPlanDraft.js`, `client/src/pages/SessionPrep.jsx`.
 
 ## Deployment
 

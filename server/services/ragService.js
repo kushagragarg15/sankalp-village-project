@@ -1,4 +1,4 @@
-const { getClient, CHAT_MODEL, EMBEDDING_MODEL, SIMILARITY_THRESHOLD } = require('./llmClient');
+const { CHAT_MODEL, EMBEDDING_MODEL, SIMILARITY_THRESHOLD, chatWithRetry } = require('./llmClient');
 const Resource = require('../models/Resource');
 const { embedText } = require('./embeddingService');
 
@@ -180,9 +180,7 @@ Please provide:
 Format the response in a clear, structured way that a volunteer can easily follow.`;
 
     // Step 3: Call the chat model of whichever provider is configured
-    const openai = getClient();
-    
-    const completion = await openai.chat.completions.create({
+    const completion = await chatWithRetry({
       model: CHAT_MODEL,
       messages: [
         { role: 'system', content: systemMessage },

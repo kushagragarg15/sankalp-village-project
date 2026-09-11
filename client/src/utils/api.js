@@ -87,6 +87,19 @@ export const aiAPI = {
   ask: (messages) => api.post('/ai/ask', { messages })
 };
 
+// Session prep: the workflow drafts a plan, the volunteer reviews it.
+export const prepAPI = {
+  getForSession: (sessionId) => api.get(`/prep/sessions/${sessionId}`),
+  prepare: (sessionId, force = false) => api.post(`/prep/sessions/${sessionId}`, { force }),
+  mine: () => api.get('/prep/mine'),
+  edit: (id, focusGroups) => api.patch(`/prep/${id}`, { focusGroups }),
+  approve: (id, note = '') => api.post(`/prep/${id}/approve`, { note }),
+  reject: (id, reason) => api.post(`/prep/${id}/reject`, { reason }),
+  // Coordinator
+  prepareAll: (sessionId) => api.post(`/prep/sessions/${sessionId}/all`),
+  allForSession: (sessionId) => api.get(`/prep/sessions/${sessionId}/all`)
+};
+
 // Volunteer Attendance API
 export const volunteerAttendanceAPI = {
   getAll: () => api.get('/volunteer-attendance'),

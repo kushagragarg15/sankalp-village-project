@@ -36,6 +36,7 @@ app.use('/api/users', require('./routes/users'));
 app.use('/api/students', require('./routes/students'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/ai', require('./routes/ai'));
+app.use('/api/prep', require('./routes/prep'));
 
 // Attendance system routes
 app.use('/api/attendance-sessions', require('./routes/attendanceSessions'));
