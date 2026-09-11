@@ -18,6 +18,8 @@ const agentRunSchema = new mongoose.Schema(
     model: { type: String, required: true },
     iterations: { type: Number, default: 0 },
     durationMs: { type: Number, default: 0 },
+    // Of durationMs, how much was spent waiting on the model (the rest is tools + DB).
+    llmMs: { type: Number, default: 0 },
     usage: {
       promptTokens: { type: Number, default: 0 },
       completionTokens: { type: Number, default: 0 }

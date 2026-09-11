@@ -1,4 +1,4 @@
-const OpenAI = require('openai');
+const { getClient, CHAT_MODEL, EMBEDDING_MODEL, SIMILARITY_THRESHOLD } = require('./llmClient');
 const Resource = require('../models/Resource');
 const { embedText } = require('./embeddingService');
 
@@ -11,6 +11,8 @@ const { embedText } = require('./embeddingService');
  * @returns {number} Similarity score between 0 and 1
  */
 function cosineSimilarity(a, b) {
+  // Different lengths means different embedding models; the number would be noise.
+  if (!a || !b || a.length !== b.length) return -1;
   let dot = 0, normA = 0, normB = 0;
   for (let i = 0; i < a.length; i++) {
     dot += a[i] * b[i];
@@ -18,6 +20,20 @@ function cosineSimilarity(a, b) {
     normB += b[i] * b[i];
   }
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+/**
+ * Regexes matching the requested class, its neighbours, and "All".
+ * "Class 5" -> [/Class 4/i, /Class 5/i, /Class 6/i, /^All$/i]. Falls back to the
+ * literal grade when it has no number in it.
+ */
+function nearbyGradePatterns(grade) {
+  const n = parseInt(String(grade).match(/\d+/)?.[0], 10);
+  if (Number.isNaN(n)) return [new RegExp(grade, 'i'), /^All$/i];
+  return [n - 1, n, n + 1]
+    .filter((g) => g >= 1)
+    .map((g) => new RegExp(`^Class ${g}$`, 'i'))
+    .concat(/^All$/i);
 }
 
 /**
@@ -37,17 +53,29 @@ function cosineSimilarity(a, b) {
  * @param {string} params.subject - The subject (Math, Science, etc.)
  * @param {string} params.grade - The grade/class level
  * @param {number} params.k - Number of top chunks to retrieve (default: 5)
- * @param {number} params.minSimilarity - Minimum similarity threshold (default: 0.75)
+ * @param {number} params.minSimilarity - Minimum similarity threshold (default: the
+ *   embedding model's SIMILARITY_THRESHOLD from llmClient)
  * @returns {Promise<Array<{text: string, similarity: number, source: object}>>}
  */
-async function retrieveContext({ topic, subject, grade, k = 5, minSimilarity = 0.75 }) {
+async function retrieveContext({ topic, subject, grade, k = 5, minSimilarity = SIMILARITY_THRESHOLD }) {
   try {
     // Step 1: Metadata pre-filter - only get resources matching subject and grade
     // This prevents comparing irrelevant documents and is much faster than
-    // scanning all chunks in the collection
+    // scanning all chunks in the collection.
+    //
+    // Grade is matched loosely: the requested class plus one either side, and
+    // resources marked "All". A Class 4 fractions guide is exactly what a
+    // volunteer teaching fractions to Class 5 needs, and with a library this
+    // small an exact match excludes most of it.
+    // Only resources embedded with the model we will embed the query with.
+    // Resources seeded before the field existed came from text-embedding-3-small.
+    const embeddedWith =
+      EMBEDDING_MODEL === 'text-embedding-3-small' ? { $in: [EMBEDDING_MODEL, null] } : EMBEDDING_MODEL;
+
     const matchingResources = await Resource.find({
       subject: { $regex: new RegExp(subject, 'i') },
-      grade: { $regex: new RegExp(grade, 'i') }
+      grade: { $in: nearbyGradePatterns(grade) },
+      embeddingModel: embeddedWith
     }).select('title subject grade chunks');
 
     if (matchingResources.length === 0) {
@@ -117,10 +145,6 @@ async function retrieveContext({ topic, subject, grade, k = 5, minSimilarity = 0
  * @returns {Promise<{lessonPlan: string, sources: Array}>}
  */
 async function generateLessonPlan({ topic, subject, grade, extraInstructions = '', k = 5 }) {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error('OPENAI_API_KEY not configured');
-  }
-
   try {
     // Step 1: Retrieve relevant context chunks
     const retrievedChunks = await retrieveContext({ topic, subject, grade, k });
@@ -155,12 +179,11 @@ Please provide:
 
 Format the response in a clear, structured way that a volunteer can easily follow.`;
 
-    // Step 3: Call OpenAI chat completions
-    // Using gpt-4o-mini as the current (2026) cheapest small model for this use case
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    // Step 3: Call the chat model of whichever provider is configured
+    const openai = getClient();
     
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini', // Current cost-effective model as of 2026
+      model: CHAT_MODEL,
       messages: [
         { role: 'system', content: systemMessage },
         { role: 'user', content: userPrompt }
@@ -188,10 +211,10 @@ Format the response in a clear, structured way that a volunteer can easily follo
     
     // Handle specific OpenAI errors
     if (error.status === 401) {
-      throw new Error('Invalid OpenAI API key');
+      throw new Error('Invalid API key for the LLM provider');
     }
     if (error.status === 429) {
-      throw new Error('OpenAI API rate limit exceeded. Please try again later.');
+      throw new Error(`LLM rate limit exceeded: ${error.message}`);
     }
     
     throw new Error(`Lesson plan generation failed: ${error.message}`);

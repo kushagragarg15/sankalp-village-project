@@ -40,7 +40,7 @@ const summariseArgs = (args) => {
     .join(' · ');
 };
 
-function Trace({ steps, iterations, durationMs, usage }) {
+function Trace({ steps, iterations, durationMs, llmMs, usage }) {
   const [open, setOpen] = useState(false);
   const tokens = (usage?.promptTokens || 0) + (usage?.completionTokens || 0);
 
@@ -71,6 +71,7 @@ function Trace({ steps, iterations, durationMs, usage }) {
           : `Looked up ${steps.length} ${steps.length === 1 ? 'thing' : 'things'}`}
         <span className="text-ink-3/70">
           · {iterations} {iterations === 1 ? 'step' : 'steps'} · {(durationMs / 1000).toFixed(1)}s
+          {llmMs > 0 && ` (model ${(llmMs / 1000).toFixed(1)}s)`}
           {tokens > 0 && ` · ${tokens.toLocaleString()} tokens`}
         </span>
       </button>
@@ -146,6 +147,7 @@ export default function AskSankalp() {
             steps: result.steps || [],
             iterations: result.iterations,
             durationMs: result.durationMs,
+            llmMs: result.llmMs,
             usage: result.usage,
           },
         },

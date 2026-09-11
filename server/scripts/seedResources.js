@@ -1,10 +1,9 @@
-const dotenv = require('dotenv');
+// Load env vars first: llmClient picks its provider when it is required.
+require('dotenv').config();
+
 const connectDB = require('../config/db');
 const Resource = require('../models/Resource');
-const { processResourceContent } = require('../services/embeddingService');
-
-// Load env vars
-dotenv.config();
+const { processResourceContent, EMBEDDING_MODEL } = require('../services/embeddingService');
 
 // Sample teaching resources covering different subjects and grades
 const sampleResources = [
@@ -559,7 +558,7 @@ async function seedResources() {
     console.log('Clearing existing resources...');
     await Resource.deleteMany({});
 
-    console.log('\nProcessing and embedding resources (this may take a minute)...\n');
+    console.log(`\nProcessing and embedding resources with ${EMBEDDING_MODEL} (this may take a minute)...\n`);
 
     for (const resourceData of sampleResources) {
       console.log(`Processing: ${resourceData.title}`);
@@ -572,7 +571,8 @@ async function seedResources() {
       // Create resource with embedded chunks
       await Resource.create({
         ...resourceData,
-        chunks
+        chunks,
+        embeddingModel: EMBEDDING_MODEL
       });
     }
 

@@ -1,4 +1,4 @@
-const OpenAI = require('openai');
+const { getClient, CHAT_MODEL } = require('./llmClient');
 const AgentRun = require('../models/AgentRun');
 const { toolsForRole, toolSchemasForRole } = require('./agentTools');
 
@@ -19,12 +19,19 @@ const { toolsForRole, toolSchemasForRole } = require('./agentTools');
  * ship from a demo.
  */
 
-const MODEL = process.env.OPENAI_AGENT_MODEL || 'gpt-4o-mini';
+const MODEL = CHAT_MODEL;
 const MAX_ITERATIONS = 6; // model turns, i.e. at most 5 rounds of tool calls
 const TOOL_TIMEOUT_MS = 12000;
 const MAX_TOOL_RESULT_CHARS = 6000; // keeps one chatty tool from eating the context window
 const MAX_HISTORY_MESSAGES = 12;
 const MAX_MESSAGE_CHARS = 2000;
+// Thinking models spend output tokens on reasoning before the visible answer,
+// and the OpenAI-compatible endpoints count both against max_tokens. Too small
+// a cap truncates the answer mid-sentence.
+const MAX_OUTPUT_TOKENS = 4000;
+// Free-tier providers rate-limit per minute; the SDK's own backoff (max ~8s)
+// gives up long before the window resets.
+const RETRY_DELAYS_MS = [2000, 5000, 12000, 25000];
 
 const buildSystemPrompt = (user) => {
   const today = new Date().toLocaleDateString('en-IN', {
@@ -38,7 +45,8 @@ const buildSystemPrompt = (user) => {
     '',
     'How to work:',
     '- Answer from the tools, not from memory. If a question needs club data, call a tool first. Never invent students, volunteers, sessions or scores.',
-    '- Prefer one well-chosen tool call over many. Call several tools only when the question genuinely spans them.',
+    '- Prefer one well-chosen tool call over many. Call several tools only when the question genuinely spans them. Do not re-fetch a student, session or volunteer you already have data for from an earlier tool result.',
+    '- Every reply is either tool calls or the final answer. Never write what you are about to do ("Let me check…", "I will look up…") — call the tool instead. Once you have enough, answer.',
     '- If a tool reports an ambiguous name, ask the user which one they meant rather than guessing.',
     '- If the data is not there, say so plainly.',
     '- Be brief and concrete: short paragraphs, plain lists, dates like "Sat 6 Sep". No headings, no filler, no emoji.',
@@ -68,6 +76,29 @@ const withTimeout = (promise, ms, label) =>
   ]);
 
 const truncate = (s, n) => (s.length > n ? `${s.slice(0, n)}\n…[truncated ${s.length - n} chars]` : s);
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Retry the model call on 429 (rate limit) and 5xx (provider hiccup), honouring
+ * Retry-After when the provider sends one. Anything else — a bad key, a bad
+ * request — is not going to get better by waiting, so it is thrown at once.
+ */
+async function createCompletionWithRetry(openai, params) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await openai.chat.completions.create(params);
+    } catch (err) {
+      const retryable = err.status === 429 || (err.status >= 500 && err.status < 600);
+      if (!retryable || attempt >= RETRY_DELAYS_MS.length) throw err;
+
+      const retryAfterSec = Number(err.headers?.['retry-after']);
+      const delay = retryAfterSec > 0 ? retryAfterSec * 1000 : RETRY_DELAYS_MS[attempt];
+      console.warn(`LLM ${err.status}; retrying in ${delay}ms (attempt ${attempt + 1}/${RETRY_DELAYS_MS.length})`);
+      await sleep(delay);
+    }
+  }
+}
 
 /**
  * Run one tool call the model asked for.
@@ -111,8 +142,6 @@ async function executeToolCall(call, allowedTools, ctx) {
  * @returns {Promise<{answer: string, steps: Array, iterations: number, usage: object, durationMs: number, status: string, runId: string}>}
  */
 async function runAgent({ messages, user }) {
-  if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY not configured');
-
   const started = Date.now();
   const history = sanitiseHistory(messages);
   const question = history[history.length - 1]?.content || '';
@@ -124,29 +153,36 @@ async function runAgent({ messages, user }) {
   const transcript = [{ role: 'system', content: buildSystemPrompt(user) }, ...history];
   const steps = [];
   const usage = { promptTokens: 0, completionTokens: 0 };
+  let llmMs = 0; // wall time waiting on the model, as opposed to running tools
   let iterations = 0;
   let answer = '';
   let status = 'completed';
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = getClient();
 
   try {
     while (iterations < MAX_ITERATIONS) {
       iterations += 1;
 
-      const completion = await openai.chat.completions.create({
+      const llmStarted = Date.now();
+      const completion = await createCompletionWithRetry(openai, {
         model: MODEL,
         messages: transcript,
         tools: toolSchemas,
         tool_choice: 'auto',
         temperature: 0.2,
-        max_tokens: 1200
+        max_tokens: MAX_OUTPUT_TOKENS
       });
 
+      llmMs += Date.now() - llmStarted;
       usage.promptTokens += completion.usage?.prompt_tokens || 0;
       usage.completionTokens += completion.usage?.completion_tokens || 0;
 
-      const message = completion.choices[0].message;
+      const choice = completion.choices[0];
+      const message = choice.message;
+      if (choice.finish_reason === 'length') {
+        console.warn(`LLM output hit max_tokens (${MAX_OUTPUT_TOKENS}) on iteration ${iterations}`);
+      }
       transcript.push(message);
 
       const calls = message.tool_calls || [];
@@ -193,11 +229,11 @@ async function runAgent({ messages, user }) {
     }
   } catch (err) {
     status = 'error';
-    await persistRun({ user, question, answer: '', status, iterations, usage, steps, started, error: err.message });
+    await persistRun({ user, question, answer: '', status, iterations, usage, steps, started, llmMs, error: err.message });
     throw err;
   }
 
-  const runId = await persistRun({ user, question, answer, status, iterations, usage, steps, started });
+  const runId = await persistRun({ user, question, answer, status, iterations, usage, steps, started, llmMs });
 
   return {
     answer,
@@ -205,6 +241,7 @@ async function runAgent({ messages, user }) {
     iterations,
     usage,
     durationMs: Date.now() - started,
+    llmMs,
     status,
     runId
   };
@@ -212,7 +249,7 @@ async function runAgent({ messages, user }) {
 
 // The trace is an audit log, not part of the answer — a failure to write it must
 // not turn a good answer into an error for the user.
-async function persistRun({ user, question, answer, status, iterations, usage, steps, started, error = '' }) {
+async function persistRun({ user, question, answer, status, iterations, usage, steps, started, llmMs = 0, error = '' }) {
   try {
     const run = await AgentRun.create({
       userId: user._id,
@@ -223,6 +260,7 @@ async function persistRun({ user, question, answer, status, iterations, usage, s
       model: MODEL,
       iterations,
       durationMs: Date.now() - started,
+      llmMs,
       usage,
       steps,
       error

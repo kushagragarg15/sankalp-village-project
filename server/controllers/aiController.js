@@ -1,8 +1,8 @@
-const OpenAI = require('openai');
 const Resource = require('../models/Resource');
 const { processResourceContent } = require('../services/embeddingService');
 const { generateLessonPlan } = require('../services/ragService');
 const { runAgent } = require('../services/agentService');
+const { isConfigured, notConfiguredMessage, EMBEDDING_MODEL } = require('../services/llmClient');
 
 // @desc    Generate teaching notes using RAG (Retrieval-Augmented Generation)
 // @route   POST /api/ai/generate-notes
@@ -26,11 +26,8 @@ exports.generateTeachingNotes = async (req, res, next) => {
     }
 
     // Check if OpenAI API key is configured
-    if (!process.env.OPENAI_API_KEY) {
-      return res.status(503).json({
-        success: false,
-        message: 'AI service not configured. Please add OPENAI_API_KEY to environment variables.'
-      });
+    if (!isConfigured()) {
+      return res.status(503).json({ success: false, message: notConfiguredMessage() });
     }
 
     // Generate lesson plan using RAG
@@ -56,17 +53,17 @@ exports.generateTeachingNotes = async (req, res, next) => {
     console.error('Error in generateTeachingNotes:', error);
     
     // Handle specific error messages from RAG service
-    if (error.message.includes('Invalid OpenAI API key')) {
+    if (/Invalid .*API key/i.test(error.message)) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid OpenAI API key'
+        message: 'Invalid API key for the LLM provider'
       });
     }
 
-    if (error.message.includes('rate limit')) {
+    if (/rate limit/i.test(error.message)) {
       return res.status(429).json({
         success: false,
-        message: 'OpenAI API rate limit exceeded. Please try again later.'
+        message: 'LLM rate limit exceeded. Please try again later.'
       });
     }
 
@@ -89,23 +86,21 @@ exports.createResource = async (req, res, next) => {
     }
 
     // Check if OpenAI API key is configured
-    if (!process.env.OPENAI_API_KEY) {
-      return res.status(503).json({
-        success: false,
-        message: 'AI service not configured. Please add OPENAI_API_KEY to environment variables.'
-      });
+    if (!isConfigured()) {
+      return res.status(503).json({ success: false, message: notConfiguredMessage() });
     }
 
     // Process content: chunk and embed
     const chunks = await processResourceContent(content);
 
-    // Create resource with embedded chunks
+    // Create resource with embedded chunks, recording which model produced them
     const resource = await Resource.create({
       title,
       subject,
       grade,
       content,
       chunks,
+      embeddingModel: EMBEDDING_MODEL,
       createdBy: req.user._id
     });
 
@@ -167,11 +162,8 @@ exports.askAgent = async (req, res, next) => {
       });
     }
 
-    if (!process.env.OPENAI_API_KEY) {
-      return res.status(503).json({
-        success: false,
-        message: 'AI service not configured. Please add OPENAI_API_KEY to environment variables.'
-      });
+    if (!isConfigured()) {
+      return res.status(503).json({ success: false, message: notConfiguredMessage() });
     }
 
     const result = await runAgent({ messages, user: req.user });
@@ -180,8 +172,8 @@ exports.askAgent = async (req, res, next) => {
   } catch (error) {
     console.error('Error in askAgent:', error);
 
-    if (error.status === 401 || error.message.includes('Invalid OpenAI API key')) {
-      return res.status(401).json({ success: false, message: 'Invalid OpenAI API key' });
+    if (error.status === 401 || /Invalid .*API key/i.test(error.message)) {
+      return res.status(401).json({ success: false, message: 'Invalid API key for the LLM provider' });
     }
     // OpenAI answers 429 for both a burst limit and an empty balance; only one
     // of those is fixed by waiting.
@@ -190,8 +182,8 @@ exports.askAgent = async (req, res, next) => {
       return res.status(429).json({
         success: false,
         message: outOfCredits
-          ? 'The AI service has no credits left. Ask the coordinator to top up the OpenAI account.'
-          : 'OpenAI API rate limit exceeded. Please try again later.'
+          ? 'The AI service has no credits left. Ask the coordinator to top up the provider account.'
+          : 'LLM rate limit exceeded. Please try again later.'
       });
     }
 

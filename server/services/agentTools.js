@@ -66,9 +66,8 @@ const tools = [
     },
     roles: ROLES.ALL,
     async run({ topic, subject, grade }) {
-      const chunks = await retrieveContext({
-        topic, subject: normaliseSubject(subject), grade, k: 4, minSimilarity: 0.6
-      });
+      // Threshold left to the embedding model's default (see llmClient).
+      const chunks = await retrieveContext({ topic, subject: normaliseSubject(subject), grade, k: 4 });
       return {
         matches: chunks.length,
         passages: chunks.map((c) => ({
@@ -116,7 +115,9 @@ const tools = [
     description:
       "Look up one student by name (partial names work). Returns their class, how many sessions " +
       'they attended, which subjects and topics they were taught (most recent first) and their ' +
-      'quiz scores. Use this for any question about a specific child.',
+      'quiz scores. This is THE tool for any question about a named child ("how is Aarti doing?"), ' +
+      "whoever taught them. Only skip it if you already have that child's data from a tool result " +
+      'earlier in this conversation.',
     parameters: {
       type: 'object',
       properties: {
@@ -330,9 +331,10 @@ const tools = [
   {
     name: 'get_my_teaching_history',
     description:
-      "The signed-in user's own teaching record: total lessons, distinct students, subjects " +
-      'taught, and their most recent lessons. Use for "what did I teach last time", "who have ' +
-      'I been teaching", "what should I revise with my students".',
+      "The signed-in user's own teaching record: totals, their most recent lessons, AND a " +
+      'per-student summary (what I taught each child, when I last saw them, their quiz average). ' +
+      'Use for "what did I teach last time", "who have I been teaching", "what should I revise ' +
+      'with my students". It already answers the per-student question — no further lookups needed.',
     parameters: {
       type: 'object',
       properties: {
@@ -342,7 +344,7 @@ const tools = [
     roles: ROLES.ALL,
     async run({ limit = 15 }, ctx) {
       const n = Math.min(Math.max(limit, 1), 40);
-      const [recent, totals] = await Promise.all([
+      const [recent, totals, perStudent] = await Promise.all([
         TeachingLog.find({ volunteerId: ctx.user._id })
           .populate('studentId', 'name grade')
           .populate('sessionId', 'title startTime')
@@ -361,9 +363,42 @@ const tools = [
               subjects: { $addToSet: '$subject' }
             }
           }
+        ]),
+        // One row per child this volunteer has taught, with what and when.
+        TeachingLog.aggregate([
+          { $match: { volunteerId: ctx.user._id } },
+          { $sort: { timestamp: -1 } },
+          {
+            $group: {
+              _id: '$studentId',
+              lessons: { $sum: 1 },
+              lastTaughtByMe: { $first: '$timestamp' },
+              topics: { $push: { $concat: ['$subject', ': ', '$topic'] } }
+            }
+          },
+          { $sort: { lastTaughtByMe: -1 } },
+          { $limit: 30 },
+          { $lookup: { from: 'students', localField: '_id', foreignField: '_id', as: 'student' } },
+          { $unwind: '$student' },
+          {
+            $project: {
+              name: '$student.name',
+              grade: '$student.grade',
+              lessons: 1,
+              lastTaughtByMe: 1,
+              topics: { $slice: ['$topics', 4] },
+              quizScores: '$student.quizScores'
+            }
+          }
         ])
       ]);
       const t = totals[0];
+
+      const quizAverage = (scores) => {
+        const valid = (scores || []).filter((q) => q.maxScore);
+        if (valid.length === 0) return null;
+        return Math.round((valid.reduce((sum, q) => sum + q.score / q.maxScore, 0) / valid.length) * 100);
+      };
       return {
         volunteer: ctx.user.name,
         totals: t
@@ -381,6 +416,15 @@ const tools = [
           grade: l.studentId?.grade || null,
           subject: l.subject,
           topic: l.topic
+        })),
+        myStudents: perStudent.map((r) => ({
+          name: r.name,
+          grade: r.grade,
+          lessonsWithMe: r.lessons,
+          lastTaughtByMe: r.lastTaughtByMe,
+          daysSince: Math.floor((Date.now() - new Date(r.lastTaughtByMe)) / 86400000),
+          recentTopicsWithMe: r.topics,
+          quizAveragePercent: quizAverage(r.quizScores)
         }))
       };
     }

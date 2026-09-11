@@ -1,4 +1,4 @@
-const OpenAI = require('openai');
+const { getEmbeddingClient, EMBEDDING_MODEL } = require('./llmClient');
 
 /**
  * Simple word-count-based text chunking with overlap.
@@ -36,24 +36,19 @@ function chunkText(text, { maxWords = 300, overlapWords = 50 } = {}) {
 }
 
 /**
- * Generate embeddings for text using OpenAI's text-embedding-3-small model.
- * As of 2026, this remains the standard low-cost embedding model.
+ * Generate an embedding with the active provider's embedding model
+ * (see llmClient.js). Callers that store the result must also store
+ * EMBEDDING_MODEL next to it — vectors from different models are not comparable.
  * 
  * @param {string} text - The text to embed
  * @returns {Promise<number[]>} The embedding vector
  */
 async function embedText(text) {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error('OPENAI_API_KEY not configured');
-  }
-
-  const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY
-  });
+  const client = getEmbeddingClient();
 
   try {
-    const response = await openai.embeddings.create({
-      model: 'text-embedding-3-small',
+    const response = await client.embeddings.create({
+      model: EMBEDDING_MODEL,
       input: text,
       encoding_format: 'float'
     });
@@ -90,5 +85,6 @@ async function processResourceContent(content, options = {}) {
 module.exports = {
   chunkText,
   embedText,
-  processResourceContent
+  processResourceContent,
+  EMBEDDING_MODEL
 };

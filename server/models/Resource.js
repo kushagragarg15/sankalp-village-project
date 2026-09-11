@@ -20,6 +20,13 @@ const resourceSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Resource content is required']
   },
+  // Which model produced `chunks[].embedding`. Retrieval only compares vectors
+  // from the model currently configured (llmClient.EMBEDDING_MODEL); a query
+  // embedded by one model is meaningless against chunks from another.
+  embeddingModel: {
+    type: String,
+    default: null
+  },
   // Pre-computed chunks with embeddings for RAG retrieval
   chunks: [{
     text: {
@@ -40,6 +47,6 @@ const resourceSchema = new mongoose.Schema({
 });
 
 // Index for efficient metadata-based filtering before vector search
-resourceSchema.index({ subject: 1, grade: 1 });
+resourceSchema.index({ embeddingModel: 1, subject: 1, grade: 1 });
 
 module.exports = mongoose.model('Resource', resourceSchema);

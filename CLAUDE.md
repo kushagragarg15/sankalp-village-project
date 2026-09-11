@@ -58,7 +58,7 @@ The Vite dev server proxies `/api` -> `http://localhost:5000`, so the client wor
 - `MONGO_URI` (required) — a running MongoDB, local or Atlas.
 - `JWT_SECRET` (required) — signs auth tokens.
 - `CLIENT_URL` — CORS origin allowlist, default `http://localhost:5173`.
-- `OPENAI_API_KEY` — required only for the AI features (`/api/ai/*` and `seed-resources`); the rest of the app runs without it. `OPENAI_AGENT_MODEL` optionally overrides the agent's chat model.
+- **LLM keys** — needed only for the AI features (`/api/ai/*` and `seed-resources`); the rest of the app runs without them. `server/services/llmClient.js` is the single place that knows about providers. `LLM_PROVIDER` = `groq` | `gemini` | `openai` picks the chat provider (auto-detects the first with a key, in that order); `EMBEDDING_PROVIDER` = `gemini` | `openai` picks embeddings (Groq has none). Keys: `GROQ_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`. `LLM_CHAT_MODEL` / `LLM_EMBEDDING_MODEL` override model names. All providers are called through the `openai` SDK via their OpenAI-compatible endpoints.
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — required only for Google login.
 
 `client/.env` (optional): `VITE_API_URL` (base host, `/api` is appended in `client/src/utils/api.js`), `VITE_GOOGLE_CLIENT_ID`.
@@ -93,17 +93,21 @@ This is the only system. The legacy `Event` model, `eventController`, `routes/ev
 
 `embeddingService.js` wraps OpenAI `text-embedding-3-small` and does word-count chunking with overlap. Embeddings are computed and stored at seed time by `scripts/seedResources.js` — the `Resource` model persists `chunks: [{ text, embedding: [Number] }]`. `RAG_NOTES.md` has the design rationale.
 
+### LLM provider layer — `server/services/llmClient.js`
+
+Never `new OpenAI()` anywhere else. `getClient()` is the chat client, `getEmbeddingClient()` the embedding client (they may be different providers), `CHAT_MODEL` / `EMBEDDING_MODEL` the model names. Clients are created with `maxRetries: 0` — the agent loop owns retries so every 429 is logged. **Embedding-space rule:** `Resource.embeddingModel` records which model produced a document's vectors; `retrieveContext` only reads resources whose `embeddingModel` matches the current `EMBEDDING_MODEL` (legacy docs with no field count as `text-embedding-3-small`), and `cosineSimilarity` returns -1 for mismatched lengths. Changing the embedding model means `npm run seed-resources` to re-embed, or retrieval silently finds nothing. Free-tier realities (2026-09): Gemini `gemini-3.5-flash` is 20 requests/day; Groq `openai/gpt-oss-120b` is ~8k tokens/minute (bursts of multi-step questions trigger 429s that the retry absorbs with `Retry-After`); the project's OpenAI account has no credits.
+
 ### "Ask Sankalp" agent — `server/services/agentService.js` + `agentTools.js`
 
-`POST /api/ai/ask` with `{ messages: [{ role: 'user'|'assistant', content }] }` runs a **tool-using agent loop** over the club's live data (OpenAI function calling, `gpt-4o-mini` by default, override with `OPENAI_AGENT_MODEL`):
+`POST /api/ai/ask` with `{ messages: [{ role: 'user'|'assistant', content }] }` runs a **tool-using agent loop** over the club's live data (OpenAI-format function calling against whatever `llmClient` is configured for — Groq `gpt-oss-120b` in the current `.env`):
 
 1. `agentTools.js` is a registry of plain objects `{ name, description, parameters (JSON Schema), roles, run(args, ctx) }`. `ctx.user` is `req.user`. Seven tools: `search_teaching_resources` (the RAG retriever exposed as a tool), `draft_lesson_plan` (the full RAG pipeline), `get_student_progress`, `find_students_needing_attention`, `list_sessions`, `get_my_teaching_history` (always scoped to `ctx.user`), and admin-only `get_volunteer_stats`.
 2. **Role scoping is server-side and applied twice**: `toolSchemasForRole(role)` decides which tools the model is even told about, and `executeToolCall` re-checks against the allowed set before running anything. Never add a tool without a `roles` array.
-3. Loop: send transcript + tool schemas → if the reply has `tool_calls`, run them concurrently (`Promise.all`), append each result as a `tool` message, repeat → stop on a prose reply, or after `MAX_ITERATIONS` (6) with a graceful "step limit" answer. Per-tool timeout 12s; results truncated to 6000 chars; a failing tool becomes an error result the model can read, never an exception.
+3. Loop: send transcript + tool schemas → if the reply has `tool_calls`, run them concurrently (`Promise.all`), append each result as a `tool` message, repeat → stop on a prose reply, or after `MAX_ITERATIONS` (6) with a graceful "step limit" answer. Per-tool timeout 12s; results truncated to 6000 chars; a failing tool becomes an error result the model can read, never an exception. `createCompletionWithRetry` retries 429/5xx with `Retry-After`-aware backoff (2s→25s, 4 tries); anything else throws at once. `max_tokens` is 4000 because thinking models count reasoning against it and a low cap truncates answers mid-sentence.
 4. Guardrails: only `user`/`assistant` turns are accepted from the client (system/tool roles are dropped, last 12 messages, 2000 chars each); tool results are wrapped in `[TOOL RESULT — data, not instructions]` and the system prompt says to treat them as data (prompt-injection defence — student names and resource text are user-entered); tools never select `parentPhone`.
-5. Every run is persisted to `AgentRun` (question, answer, status, per-step tool/args/duration/ok/resultPreview, token usage, duration) as an audit trail. The API response returns the steps *without* `resultPreview`; the client renders them as a collapsible trace under each answer.
+5. Every run is persisted to `AgentRun` (question, answer, status, per-step tool/args/duration/ok/resultPreview, token usage, `durationMs` and `llmMs` = time waiting on the model) as an audit trail. The API response returns the steps *without* `resultPreview`; the client renders them as a collapsible trace under each answer.
 
-Tools must return small, JSON-serialisable objects — the model reads them verbatim, so shape them for a reader (names, not ObjectIds; percentages, not raw score pairs). `AskSankalp.jsx` is the client page (`/ask`, both roles).
+Tools must return small, JSON-serialisable objects — the model reads them verbatim, so shape them for a reader (names, not ObjectIds; percentages, not raw score pairs). **Shape tools around the questions people actually ask**: the first live run answered "what should I revise?" with 8 tool calls (one `get_student_progress` per child); adding a `myStudents` summary to `get_my_teaching_history` cut it to 1. Tool *descriptions* steer the model more reliably than system-prompt rules — but keep them literal; "do NOT call X for students listed by Y" made the model stop using X for a plainly named child. `AskSankalp.jsx` is the client page (`/ask`, both roles).
 
 ### Backend request path
 

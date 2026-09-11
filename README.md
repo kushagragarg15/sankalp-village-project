@@ -36,7 +36,7 @@ Sankalp is a full-stack web application designed to coordinate weekend teaching 
 - MongoDB with Mongoose ODM
 - JWT authentication
 - bcrypt password hashing
-- OpenAI API integration (RAG-powered lesson planning)
+- LLM integration via OpenAI-compatible APIs (Groq, Gemini or OpenAI — switchable by env var)
 
 ## Getting Started
 
@@ -62,7 +62,11 @@ PORT=5000
 MONGO_URI=mongodb://localhost:27017/sankalp-village-project
 JWT_SECRET=your_secure_jwt_secret_key
 CLIENT_URL=http://localhost:5173
-OPENAI_API_KEY=your_openai_api_key  # Optional
+# AI features (optional). Groq for chat, Gemini for embeddings is the free setup.
+GROQ_API_KEY=your_groq_key
+GEMINI_API_KEY=your_gemini_key
+LLM_PROVIDER=groq
+EMBEDDING_PROVIDER=gemini
 ```
 
 3. **Install dependencies**
@@ -83,7 +87,7 @@ npm install
 ```bash
 cd server
 npm run create-test-data   # Creates test volunteer accounts and students
-npm run seed-resources     # Seeds teaching resources + embeddings for RAG (needs OPENAI_API_KEY)
+npm run seed-resources     # Seeds teaching resources + embeddings for RAG (needs an embedding provider key)
 ```
 
 This creates 15 test volunteer accounts and 15 students. Attendance sessions are created from the app (admin UI), and no admin account is seeded — see **Demo Credentials** below for how to get admin access.
@@ -191,6 +195,8 @@ Beyond single-shot RAG, the platform includes an **agent** that answers free-for
 - **Role-scoped tools**: volunteers are never shown admin tools; the server re-checks every call before executing it
 - **Guardrails**: tool results are labelled as data (prompt-injection defence), per-tool timeouts, result truncation, transcript sanitising, no contact details ever reach the model
 - **Full trace**: every run is persisted (`AgentRun`) with tool calls, arguments, latency and token usage; the UI shows what was looked up under each answer
+- **Provider-agnostic**: chat and embeddings are routed through one `llmClient` layer; swapping Groq / Gemini / OpenAI is an env-var change. Embeddings are stamped with the model that produced them so vectors from different models are never compared
+- **Resilient**: `Retry-After`-aware backoff on rate limits, per-tool timeouts, graceful step-limit answers
 
 Implementation: `server/services/agentService.js` (loop), `server/services/agentTools.js` (registry), `client/src/pages/AskSankalp.jsx`.
 
