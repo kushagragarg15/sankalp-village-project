@@ -80,6 +80,13 @@ export const userAPI = {
   remove: (id) => api.delete(`/users/${id}`)
 };
 
+// AI: the RAG lesson planner and the tool-using agent
+export const aiAPI = {
+  generateNotes: (data) => api.post('/ai/generate-notes', data),
+  // messages: [{ role: 'user' | 'assistant', content }], last one is the new question
+  ask: (messages) => api.post('/ai/ask', { messages })
+};
+
 // Volunteer Attendance API
 export const volunteerAttendanceAPI = {
   getAll: () => api.get('/volunteer-attendance'),

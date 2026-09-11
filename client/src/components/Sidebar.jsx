@@ -12,6 +12,7 @@ const adminLinks = [
   { path: '/students', label: 'Students' },
   { path: '/analytics', label: 'Insights' },
   { path: '/ai-notes', label: 'Lesson planner' },
+  { path: '/ask', label: 'Ask' },
 ];
 
 const volunteerLinks = [
@@ -21,6 +22,7 @@ const volunteerLinks = [
   { path: '/students', label: 'Students' },
   { path: '/analytics', label: 'Insights' },
   { path: '/ai-notes', label: 'Lesson planner' },
+  { path: '/ask', label: 'Ask' },
 ];
 
 export default function Sidebar({ onNavigate, liveCount = 0 }) {

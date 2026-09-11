@@ -2,6 +2,7 @@ const OpenAI = require('openai');
 const Resource = require('../models/Resource');
 const { processResourceContent } = require('../services/embeddingService');
 const { generateLessonPlan } = require('../services/ragService');
+const { runAgent } = require('../services/agentService');
 
 // @desc    Generate teaching notes using RAG (Retrieval-Augmented Generation)
 // @route   POST /api/ai/generate-notes
@@ -140,6 +141,60 @@ exports.getResources = async (req, res, next) => {
     });
   } catch (error) {
     console.error('Error fetching resources:', error);
+    next(error);
+  }
+};
+
+// @desc    Ask the tool-using agent a question about the club's data
+// @route   POST /api/ai/ask
+// @access  Private (tools are scoped to req.user.role inside the service)
+exports.askAgent = async (req, res, next) => {
+  try {
+    const { messages } = req.body;
+
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'messages must be a non-empty array of { role, content }'
+      });
+    }
+
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== 'user' || typeof last.content !== 'string' || !last.content.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'The last message must be a non-empty user message'
+      });
+    }
+
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(503).json({
+        success: false,
+        message: 'AI service not configured. Please add OPENAI_API_KEY to environment variables.'
+      });
+    }
+
+    const result = await runAgent({ messages, user: req.user });
+
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    console.error('Error in askAgent:', error);
+
+    if (error.status === 401 || error.message.includes('Invalid OpenAI API key')) {
+      return res.status(401).json({ success: false, message: 'Invalid OpenAI API key' });
+    }
+    // OpenAI answers 429 for both a burst limit and an empty balance; only one
+    // of those is fixed by waiting.
+    if (error.status === 429 || error.message.includes('rate limit')) {
+      const outOfCredits = /credit|quota|billing/i.test(error.message);
+      return res.status(429).json({
+        success: false,
+        message: outOfCredits
+          ? 'The AI service has no credits left. Ask the coordinator to top up the OpenAI account.'
+          : 'OpenAI API rate limit exceeded. Please try again later.'
+      });
+    }
+
     next(error);
   }
 };

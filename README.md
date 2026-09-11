@@ -21,6 +21,7 @@ Sankalp is a full-stack web application designed to coordinate weekend teaching 
 - **Attendance History**: View personal participation records
 - **Student Progress Tracking**: Monitor individual student development
 - **RAG-Powered Teaching Notes Generator**: Create structured lesson plans grounded in curated teaching resources using Retrieval-Augmented Generation (RAG)
+- **Ask Sankalp (AI agent)**: Ask questions in plain language — "what did I teach last time?", "which Class 4 students have we missed?" — answered by a tool-using agent over live club data, with a visible trace of every lookup it made
 
 ## Tech Stack
 
@@ -164,7 +165,8 @@ sankalps-village-project/
 - `GET /api/analytics/dashboard` - Dashboard statistics
 - `GET /api/analytics/impact` - Impact metrics
 
-### AI/RAG
+### AI
+- `POST /api/ai/ask` - Ask the tool-using agent (`{ messages: [{ role, content }] }`)
 - `POST /api/ai/generate-notes` - Generate lesson plan using RAG
 - `GET /api/ai/resources` - List teaching resources
 - `POST /api/ai/resources` - Create teaching resource (Admin)
@@ -179,6 +181,18 @@ This platform includes a Retrieval-Augmented Generation (RAG) system for creatin
 - **Transparent AI**: Displays similarity scores and source snippets for full transparency
 
 For technical details, see **[RAG_NOTES.md](RAG_NOTES.md)** - concise implementation overview optimized for technical interviews.
+
+## Ask Sankalp — Tool-Using AI Agent
+
+Beyond single-shot RAG, the platform includes an **agent** that answers free-form questions by calling tools over the live database:
+
+- **Agent loop**: the model chooses which tools to call (and in what order); the server runs them, feeds results back, and repeats until the model answers — capped at 6 iterations
+- **7 tools**, including the RAG retriever itself (`search_teaching_resources`), student progress, at-risk detection, sessions, the user's own teaching history, and volunteer statistics
+- **Role-scoped tools**: volunteers are never shown admin tools; the server re-checks every call before executing it
+- **Guardrails**: tool results are labelled as data (prompt-injection defence), per-tool timeouts, result truncation, transcript sanitising, no contact details ever reach the model
+- **Full trace**: every run is persisted (`AgentRun`) with tool calls, arguments, latency and token usage; the UI shows what was looked up under each answer
+
+Implementation: `server/services/agentService.js` (loop), `server/services/agentTools.js` (registry), `client/src/pages/AskSankalp.jsx`.
 
 ## Deployment
 
