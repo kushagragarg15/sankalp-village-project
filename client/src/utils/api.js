@@ -83,8 +83,14 @@ export const userAPI = {
 // AI: the RAG lesson planner and the tool-using agent
 export const aiAPI = {
   generateNotes: (data) => api.post('/ai/generate-notes', data),
-  // messages: [{ role: 'user' | 'assistant', content }], last one is the new question
-  ask: (messages) => api.post('/ai/ask', { messages }),
+  // { conversationId?, question }: the server keeps the history. Omit the id
+  // to start a new conversation; the response carries the id to continue it.
+  ask: (payload) => api.post('/ai/ask', payload),
+
+  // Conversation history (server-side, per user)
+  conversations: () => api.get('/ai/conversations'),
+  conversation: (id) => api.get(`/ai/conversations/${id}`),
+  deleteConversation: (id) => api.delete(`/ai/conversations/${id}`),
 
   /**
    * Same as ask(), but streamed as Server-Sent Events so the page can show
@@ -93,7 +99,7 @@ export const aiAPI = {
    * Calls onEvent for every event; resolves with the 'done' payload; rejects
    * on transport failure or an 'error' event.
    */
-  askStream: async (messages, onEvent, { signal } = {}) => {
+  askStream: async (payload, onEvent, { signal } = {}) => {
     const token = localStorage.getItem('token');
     const response = await fetch(`${api.defaults.baseURL}/ai/ask/stream`, {
       method: 'POST',
@@ -103,7 +109,7 @@ export const aiAPI = {
         Accept: 'text/event-stream',
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       },
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify(payload),
       signal
     });
 

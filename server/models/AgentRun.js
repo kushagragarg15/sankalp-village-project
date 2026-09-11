@@ -7,6 +7,10 @@ const mongoose = require('mongoose');
 const agentRunSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    // Runs that belong to the same chat. The server assigns one on the first
+    // question and rebuilds the transcript from these rows on every later one,
+    // so history survives a reload and the client never has to resend it.
+    conversationId: { type: mongoose.Schema.Types.ObjectId, required: true, index: true },
     role: { type: String, enum: ['admin', 'volunteer'], required: true },
     question: { type: String, required: true },
     answer: { type: String, default: '' },
@@ -43,5 +47,6 @@ const agentRunSchema = new mongoose.Schema(
 );
 
 agentRunSchema.index({ userId: 1, createdAt: -1 });
+agentRunSchema.index({ userId: 1, conversationId: 1, createdAt: 1 });
 
 module.exports = mongoose.model('AgentRun', agentRunSchema);

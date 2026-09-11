@@ -127,6 +127,10 @@ const getClient = () => clientFor(CHAT_PROVIDER);
 // gives up long before the window resets, so clients are built with
 // maxRetries 0 and this is the one retry path for every chat call.
 const RETRY_DELAYS_MS = [2000, 5000, 12000, 25000];
+// A provider may ask us to wait minutes (a daily quota, say). Nobody is going
+// to sit at a spinner that long: past this cap we fail at once and pass the
+// suggested wait up, so the user sees "try again in 4 minutes" instead.
+const MAX_RETRY_WAIT_MS = Number(process.env.LLM_MAX_RETRY_WAIT_MS || 30000);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // How long the provider asked us to wait, if it said. Groq puts it in the
@@ -134,8 +138,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const suggestedDelayMs = (err) => {
   const header = Number(err.headers?.['retry-after']);
   if (header > 0) return header * 1000;
-  const m = /try again in ([\d.]+)\s*s/i.exec(err.message || '');
-  if (m) return Math.ceil(Number(m[1]) * 1000) + 500;
+  // "11.2s", "4m1.05s", "1h2m3s" — Groq writes the wait in mixed units.
+  const m = /try again in ((?:\d+h)?(?:\d+m)?(?:[\d.]+s)?)/i.exec(err.message || '');
+  if (m && m[1]) {
+    const h = Number((/(\d+)h/.exec(m[1]) || [])[1] || 0);
+    const min = Number((/(\d+)m/.exec(m[1]) || [])[1] || 0);
+    const sec = Number((/([\d.]+)s/.exec(m[1]) || [])[1] || 0);
+    const total = h * 3600 + min * 60 + sec;
+    if (total > 0) return Math.ceil(total * 1000) + 500;
+  }
   return null;
 };
 
@@ -152,7 +163,12 @@ async function chatWithRetry(params) {
     } catch (err) {
       const retryable = err.status === 429 || (err.status >= 500 && err.status < 600);
       if (!retryable || attempt >= RETRY_DELAYS_MS.length) throw err;
-      const delay = suggestedDelayMs(err) || RETRY_DELAYS_MS[attempt];
+      const suggested = suggestedDelayMs(err);
+      if (suggested && suggested > MAX_RETRY_WAIT_MS) {
+        err.retryAfterMs = suggested;
+        throw err;
+      }
+      const delay = suggested || RETRY_DELAYS_MS[attempt];
       console.warn(`LLM ${err.status}; retrying in ${delay}ms (attempt ${attempt + 1}/${RETRY_DELAYS_MS.length})`);
       await sleep(delay);
     }
@@ -178,7 +194,12 @@ async function chatStreamWithRetry(params) {
     } catch (err) {
       const retryable = err.status === 429 || (err.status >= 500 && err.status < 600);
       if (!retryable || attempt >= RETRY_DELAYS_MS.length) throw err;
-      const delay = suggestedDelayMs(err) || RETRY_DELAYS_MS[attempt];
+      const suggested = suggestedDelayMs(err);
+      if (suggested && suggested > MAX_RETRY_WAIT_MS) {
+        err.retryAfterMs = suggested;
+        throw err;
+      }
+      const delay = suggested || RETRY_DELAYS_MS[attempt];
       console.warn(`LLM ${err.status} (stream); retrying in ${delay}ms (attempt ${attempt + 1}/${RETRY_DELAYS_MS.length})`);
       await sleep(delay);
     }

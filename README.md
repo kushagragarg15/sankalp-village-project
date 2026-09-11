@@ -22,7 +22,7 @@ Sankalp is a full-stack web application designed to coordinate weekend teaching 
 - **Attendance History**: View personal participation records
 - **Student Progress Tracking**: Monitor individual student development
 - **RAG-Powered Teaching Notes Generator**: Create structured lesson plans grounded in curated teaching resources using Retrieval-Augmented Generation (RAG)
-- **Ask Sankalp (AI agent)**: Ask questions in plain language — "what did I teach last time?", "which Class 4 students have we missed?" — answered by a tool-using agent over live club data, streamed as it works, with a visible trace of every lookup it made
+- **Ask Sankalp (AI agent)**: Ask questions in plain language — "what did I teach last time?", "which Class 4 students have we missed?" — answered by a tool-using agent over live club data, streamed as it works, with a visible trace of every lookup it made. Conversations are kept per person and can be resumed, with follow-up questions understood in context
 - **Session prep (AI workflow with human sign-off)**: Before a session, a fixed pipeline reads which children you taught, what they scored and who has been missed, picks 2–3 focus groups, grounds each in the resource library and drafts a hands-on block per group. You edit, approve or reject — nothing is final until you say so
 
 ## Tech Stack
@@ -172,8 +172,9 @@ sankalps-village-project/
 - `GET /api/analytics/impact` - Impact metrics
 
 ### AI
-- `POST /api/ai/ask` - Ask the tool-using agent (`{ messages: [{ role, content }] }`)
+- `POST /api/ai/ask` - Ask the tool-using agent (`{ conversationId?, question }`)
 - `POST /api/ai/ask/stream` - Same, as Server-Sent Events
+- `GET /api/ai/conversations`, `GET /api/ai/conversations/:id`, `DELETE /api/ai/conversations/:id` - My conversation history
 - `GET /api/ai/admin/activity`, `GET /api/ai/admin/runs/:id` - AI observability (Admin)
 - `POST /api/prep/sessions/:id` - Draft (or return) my prep plan for a session (`{ force? }`)
 - `GET /api/prep/sessions/:id`, `GET /api/prep/mine` - My plans

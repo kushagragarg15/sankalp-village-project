@@ -4,7 +4,10 @@ const {
   createResource,
   getResources,
   askAgent,
-  askAgentStream
+  askAgentStream,
+  listConversations,
+  getConversation,
+  deleteConversation
 } = require('../controllers/aiController');
 const { protect, authorize } = require('../middleware/auth');
 const { aiRateLimit, aiDailyBudget } = require('../middleware/aiBudget');
@@ -25,6 +28,11 @@ router.post('/generate-notes', spend, generateTeachingNotes);
 // agent gets is decided by role inside agentService, not by this route.
 router.post('/ask', spend, askAgent);
 router.post('/ask/stream', spend, askAgentStream);
+
+// Conversation history: reading and deleting spend nothing, so no guardrails.
+router.get('/conversations', listConversations);
+router.get('/conversations/:id', getConversation);
+router.delete('/conversations/:id', deleteConversation);
 
 // Coordinator observability: what the AI did, how it was judged, how evals trend.
 router.get('/admin/activity', authorize('admin'), getActivity);
