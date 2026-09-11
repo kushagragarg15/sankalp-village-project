@@ -19,7 +19,8 @@
     "seed-club-data": "node scripts/seedClubData.js",
     "prep-next-session": "node scripts/prepNextSession.js",
     "eval:retrieval": "cross-env RAG_QUIET=1 node evals/retrieval.js",
-    "eval:generation": "cross-env RAG_QUIET=1 node evals/generation.js"
+    "eval:generation": "cross-env RAG_QUIET=1 node evals/generation.js",
+    "mcp": "node mcp/server.js"
   },
   "keywords": [
     "education",
@@ -30,6 +31,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",

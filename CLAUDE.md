@@ -30,6 +30,7 @@ npm run prep-next-session      # draft a session-prep plan for every volunteer r
                                # next session (idempotent; pass a session id to target one)
 npm run eval:retrieval         # golden-set retrieval metrics, vector vs hybrid (see server/evals/README.md)
 npm run eval:generation        # lesson-plan quality: structure checks + LLM judge (2 model calls/query)
+MCP_USER_EMAIL=<email> npm run mcp   # stdio MCP server exposing that user's agent tools (see below)
 npm run create-test-data       # create-test-volunteers + create-test-students (older, unrealistic)
 npm run create-test-volunteers
 npm run create-test-students
@@ -123,6 +124,12 @@ Every route that spends model tokens (`/api/ai/ask`, `/ask/stream`, `/generate-n
 ### AI observability — `GET /api/ai/admin/activity`, `/admin/runs/:id`, `client/src/pages/AIActivity.jsx`
 
 Admin-only. One aggregate call (`aiAdminController.getActivity`, everything in a single `Promise.all`) returns: provider/mode/budget config; agent totals for 7 days (runs, tokens, avg duration and model time, turns, lookups, by status), tool-call frequency and failure counts, per-person spend today vs budget, the last 40 runs with their tools; prep drafts by status, approval and edited-before-review rates, the last 15 **rejection reasons**; and the last retrieval and generation `EvalRun`s. `/admin/runs/:id` returns a run in full including `resultPreview`s. The page (`/ai-activity`, sidebar "AI activity") is read-only.
+
+### MCP server — `server/mcp/server.js`
+
+The agent's tool registry exposed over the Model Context Protocol (stdio) so Claude Desktop / Claude Code / any MCP client can query club data. It is an adapter, not a second implementation: tools, descriptions, schemas (JSON Schema → zod shape via `jsonSchemaToZodShape`, strings/integers/enums only — anything else throws at startup) and role scoping all come from `agentTools.js`. Identity is `MCP_USER_EMAIL`: the server runs *as* that user, exposes only `toolsForRole(user.role)`, and refuses to start without it. Also registers one resource (`sankalp://whoami`) and one prompt (`prepare_for_next_session`). **stdout is the JSON-RPC channel** — the file redirects `console.log`/`console.info` to stderr and sets `RAG_QUIET=1` before any other require; keep it that way when adding logging anywhere the tools reach. MCP calls are logged to stderr only; they are not written to `AgentRun` and do not count against the in-app token budget (no model call happens server-side — the client's model does the reasoning).
+
+Register with Claude Code: `claude mcp add sankalp -e MCP_USER_EMAIL=<email> -- node <abs path>/server/mcp/server.js`.
 
 ### Evals — `server/evals/`
 

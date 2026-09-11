@@ -211,6 +211,36 @@ Beyond single-shot RAG, the platform includes an **agent** that answers free-for
 
 Implementation: `server/services/agentService.js` (loop), `server/services/agentTools.js` (registry), `client/src/pages/AskSankalp.jsx`.
 
+## MCP Server — The Same Tools, From Any AI Client
+
+`server/mcp/server.js` exposes the agent's tool registry over the [Model Context Protocol](https://modelcontextprotocol.io) (stdio), so Claude Desktop, Claude Code or any MCP client can ask the club's data the same questions the in-app assistant can — with the same role scoping. It is an adapter over `services/agentTools.js`, not a second implementation: one registry now serves the in-app agent, the session-prep workflow, and MCP clients.
+
+- Runs **as one configured user** (`MCP_USER_EMAIL`) and exposes only that role's tools; refuses to start unscoped
+- Tools carry `readOnlyHint` annotations; a `sankalp://whoami` resource and a `prepare_for_next_session` prompt round out the three MCP primitives
+- stdout is the protocol channel; all logging goes to stderr
+
+**Claude Code**
+
+```bash
+claude mcp add sankalp -e MCP_USER_EMAIL=you@example.com -- node /absolute/path/to/server/mcp/server.js
+```
+
+**Claude Desktop** (`claude_desktop_config.json`)
+
+```json
+{
+  "mcpServers": {
+    "sankalp": {
+      "command": "node",
+      "args": ["/absolute/path/to/server/mcp/server.js"],
+      "env": { "MCP_USER_EMAIL": "you@example.com" }
+    }
+  }
+}
+```
+
+Then ask: *"Using Sankalp, which Class 4 students haven't been taught in three weeks?"*
+
 ## Evals — Measuring the AI Instead of Eyeballing It
 
 `server/evals/` holds a 29-query golden set over the resource library and two harnesses:
