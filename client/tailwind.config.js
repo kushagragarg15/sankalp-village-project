@@ -77,11 +77,32 @@ export default {
           from: { opacity: '0', transform: 'translateY(6px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        // Hero-scale entrance, reserved for one-time page arrivals (e.g. the
+        // login screen) — a longer, gentler cousin of lift-in's small-UI pop.
+        'rise-in': {
+          from: { opacity: '0', transform: 'translateY(14px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        // A mark landing — used for the single gold tick on the login screen,
+        // the same "this is live/true" dot used in Badge and LiveCode.
+        'mark-in': {
+          from: { opacity: '0', transform: 'scale(0.4)' },
+          to: { opacity: '1', transform: 'scale(1)' },
+        },
+        // A rule drawing itself downward from a mark, echoing the app's
+        // chronological spine. Pair with `origin-top`.
+        'grow-down': {
+          from: { transform: 'scaleY(0)' },
+          to: { transform: 'scaleY(1)' },
+        },
       },
       animation: {
         'rule-pulse': 'rule-pulse 1.6s ease-in-out infinite',
         'drawer-in': 'drawer-in 200ms cubic-bezier(0.32, 0.72, 0, 1)',
         'lift-in': 'lift-in 160ms ease-out',
+        'rise-in': 'rise-in 640ms cubic-bezier(0.16, 1, 0.3, 1) both',
+        'mark-in': 'mark-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both',
+        'grow-down': 'grow-down 600ms cubic-bezier(0.16, 1, 0.3, 1) both',
       },
     },
   },
