@@ -14,12 +14,22 @@ const withoutCode = (session) => {
 const forViewer = (sessions, user) =>
   user?.role === 'admin' ? sessions : sessions.map(withoutCode);
 
-// Generate random 5-character code
+// Four digits, read out loud across a noisy classroom and typed on a phone.
+//
+// This used to be five characters drawn from the alphabet and the digits, which
+// made every code a spelling test: B and D and P sound alike shouted across a
+// room, 0 and O and 1 and I look alike on a phone, and a volunteer who mishears
+// one character has to ask again while the ten-minute window runs down. Digits
+// have no homographs and a number pad to type them on. The code is not the
+// security boundary — the geofence, the session window, the ten-minute expiry
+// and the registration check are — it only has to prove someone is in the room
+// to hear it.
+const CODE_LENGTH = 4;
+
 const generateRandomCode = () => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let code = '';
-  for (let i = 0; i < 5; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  for (let i = 0; i < CODE_LENGTH; i++) {
+    code += String(Math.floor(Math.random() * 10));
   }
   return code;
 };
@@ -117,10 +127,20 @@ exports.getAllSessions = async (req, res, next) => {
     // serial round trip per session even though the writes are independent.
     // Now the whole rotation is a single bulkWrite, and sessions that already
     // hold a valid code cost nothing at all.
+    //
+    // A code from before the switch to four digits counts as stale even if it
+    // has not expired yet: the field screen only accepts digits now, so leaving
+    // an old alphanumeric code in place would lock volunteers out of a live
+    // session for the rest of its ten-minute window.
+    const isCurrentFormat = (code) => /^\d{4}$/.test(code || '');
+
     const stale = sessions.filter((session) => {
       const isActive = now >= session.startTime && now <= session.endTime;
       const hasValidCode =
-        session.activeCode && session.codeExpiry && now < session.codeExpiry;
+        session.activeCode &&
+        isCurrentFormat(session.activeCode) &&
+        session.codeExpiry &&
+        now < session.codeExpiry;
       return isActive && !hasValidCode;
     });
 

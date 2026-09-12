@@ -110,7 +110,7 @@ export default function Dashboard() {
                   {session.title}
                 </h2>
                 <p className="mt-2 max-w-[46ch] text-sm text-board-400">
-                  Ask your coordinator for the five-character code, then record each
+                  Ask your coordinator for the four-digit code, then record each
                   student you taught. You need to be at the school to submit.
                 </p>
                 <div className="mt-5">

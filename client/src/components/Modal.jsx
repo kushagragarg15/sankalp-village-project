@@ -17,6 +17,16 @@ export default function Modal({
 }) {
   const panelRef = useRef(null);
   const restoreRef = useRef(null);
+  const closeRef = useRef(onClose);
+
+  // Every caller passes an inline arrow for onClose, so its identity changes on
+  // each render of the page holding the modal — and that page re-renders on
+  // every keystroke of the form inside. With onClose in the dependency list the
+  // effect below tore down and re-ran per character: the cleanup restored focus
+  // to the trigger button and the re-run put it back on the first field, so a
+  // second character never reached the field being typed into. The handler is
+  // read from a ref instead, and the effect runs once per open.
+  closeRef.current = onClose;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -38,7 +48,7 @@ export default function Modal({
 
     const onKeyDown = (e) => {
       if (e.key === 'Escape') {
-        onClose();
+        closeRef.current?.();
         return;
       }
       if (e.key !== 'Tab') return;
@@ -61,7 +71,7 @@ export default function Modal({
       document.body.style.overflow = '';
       restoreRef.current?.focus?.();
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

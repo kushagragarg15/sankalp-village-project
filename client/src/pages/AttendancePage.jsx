@@ -4,7 +4,12 @@ import Layout from '../components/Layout';
 import LoadingState from '../components/LoadingState';
 import Button from '../components/Button';
 import EmptyState from '../components/EmptyState';
-import { attendanceSessionAPI, getStudents, teachingLogAPI } from '../utils/api';
+import {
+  attendanceSessionAPI,
+  getStudents,
+  registrationAPI,
+  teachingLogAPI,
+} from '../utils/api';
 import { useToast } from '../context/ToastContext';
 import { formatTime, sessionState } from '../utils/session';
 
@@ -20,6 +25,8 @@ export default function AttendancePage() {
 
   const [session, setSession] = useState(null);
   const [students, setStudents] = useState([]);
+  const [registered, setRegistered] = useState(false);
+  const [joining, setJoining] = useState(false);
   const [search, setSearch] = useState('');
   const [picked, setPicked] = useState({});
   const [code, setCode] = useState('');
@@ -34,13 +41,19 @@ export default function AttendancePage() {
 
     (async () => {
       try {
-        const [sessionRes, studentsRes] = await Promise.all([
+        const [sessionRes, studentsRes, registrationsRes] = await Promise.all([
           attendanceSessionAPI.getOne(sessionId),
           getStudents(),
+          registrationAPI.getMyRegistrations(),
         ]);
         if (cancelled) return;
         setSession(sessionRes.data.data);
         setStudents(studentsRes.data.data || []);
+        setRegistered(
+          (registrationsRes.data.data || []).some(
+            (reg) => (reg.sessionId?._id || reg.sessionId) === sessionId
+          )
+        );
       } catch (err) {
         if (!cancelled) setError('This session could not be loaded.');
       } finally {
@@ -72,6 +85,30 @@ export default function AttendancePage() {
   };
 
   useEffect(requestLocation, []);
+
+  // Registering is one tap from here rather than a trip back to the list: the
+  // volunteer is already standing in the classroom, and the only thing missing
+  // is a row saying so.
+  const handleRegister = async () => {
+    setJoining(true);
+    setError('');
+    try {
+      await registrationAPI.register(sessionId);
+      setRegistered(true);
+      toast.done('You are on the list. Record the lesson below.');
+    } catch (err) {
+      const message = err.response?.data?.message || '';
+      // Already registered somewhere else (another tab, another device) is not
+      // a failure — it is the state we were trying to reach.
+      if (/already registered/i.test(message)) {
+        setRegistered(true);
+      } else {
+        setError(message || 'You could not be added to this session. Try again.');
+      }
+    } finally {
+      setJoining(false);
+    }
+  };
 
   const toggle = (studentId) => {
     setPicked((current) => {
@@ -108,8 +145,8 @@ export default function AttendancePage() {
     e.preventDefault();
     setError('');
 
-    if (code.trim().length < 5) {
-      setError('Enter the five-character code your coordinator read out.');
+    if (code.length < 4) {
+      setError('Enter the four-digit code your coordinator read out.');
       return;
     }
     if (entries.length === 0) {
@@ -131,17 +168,24 @@ export default function AttendancePage() {
       const response = await teachingLogAPI.submit({
         session_id: sessionId,
         entries,
-        code: code.trim().toUpperCase(),
+        code,
         lat: location.lat,
         lng: location.lng,
       });
       toast.done(response.data.message || 'Attendance recorded.');
       navigate('/volunteer-sessions');
     } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          'Attendance was not recorded. Check the code and try again.'
-      );
+      const message = err.response?.data?.message || '';
+      // The registration can disappear under us — a coordinator removing someone
+      // from the list mid-session. Send them back to the gate rather than
+      // leaving a dead-end message under a form that will never submit.
+      if (err.response?.status === 403 && /not registered/i.test(message)) {
+        setRegistered(false);
+        setError('');
+        toast.blocked('You are no longer on the list for this session.');
+        return;
+      }
+      setError(message || 'Attendance was not recorded. Check the code and try again.');
     } finally {
       setSubmitting(false);
     }
@@ -193,15 +237,59 @@ export default function AttendancePage() {
     );
   }
 
+  const backLink = (
+    <button
+      type="button"
+      onClick={() => navigate('/volunteer-sessions')}
+      className="mb-4 text-[13px] text-ink-2 underline underline-offset-4 hover:text-ink"
+    >
+      Back to sessions
+    </button>
+  );
+
+  // Registration is checked here, before any work is asked for. The server
+  // refuses an unregistered submission anyway, but it used to do so at the end:
+  // a volunteer typed the code, ticked ten children, filled in twenty subject
+  // and topic fields, pressed submit and only then learned they were not on the
+  // list. The check belongs in front of the form, with the fix attached to it.
+  if (!registered) {
+    return (
+      <Layout>
+        {backLink}
+
+        <div className="mb-6">
+          <div className="flex items-center gap-2">
+            <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-gold animate-rule-pulse" />
+            <span className="text-[13px] font-medium text-gold-deep">Live now</span>
+            <span className="text-[13px] text-ink-2">closes {formatTime(session.endTime)}</span>
+          </div>
+          <h1 className="type-display mt-2 text-[26px] sm:text-[32px] text-ink">
+            {session.title}
+          </h1>
+        </div>
+
+        <EmptyState
+          title="Register for this session first"
+          description="Attendance is recorded against the volunteers on the session list, and you are not on it yet. Add yourself and the form opens straight away."
+          action={
+            <Button variant="live" size="lg" onClick={handleRegister} disabled={joining}>
+              {joining ? 'Registering' : 'Register for this session'}
+            </Button>
+          }
+        />
+
+        {error && (
+          <div role="alert" className="mt-4 rounded-md border border-brick-line bg-brick-wash px-4 py-3">
+            <p className="text-sm text-brick">{error}</p>
+          </div>
+        )}
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
-      <button
-        type="button"
-        onClick={() => navigate('/volunteer-sessions')}
-        className="mb-4 text-[13px] text-ink-2 underline underline-offset-4 hover:text-ink"
-      >
-        Back to sessions
-      </button>
+      {backLink}
 
       <div className="mb-6">
         <div className="flex items-center gap-2">
@@ -222,26 +310,30 @@ export default function AttendancePage() {
             Session code
           </label>
           <p className="mt-1 text-[13px] text-ink-2">
-            Five characters, read out by your coordinator. It changes every ten minutes.
+            Four digits, read out by your coordinator. It changes every ten minutes.
           </p>
           <input
             id="code"
             value={code}
             onChange={(e) => {
-              setCode(e.target.value.toUpperCase().slice(0, 5));
+              // Digits only, so a stray letter or a pasted space cannot sit in
+              // the field looking like a wrong code.
+              setCode(e.target.value.replace(/\D/g, '').slice(0, 4));
               setError('');
             }}
-            maxLength={5}
-            autoComplete="off"
-            autoCapitalize="characters"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={4}
+            autoComplete="one-time-code"
             autoCorrect="off"
             spellCheck="false"
-            placeholder="—————"
+            placeholder="————"
             aria-describedby="code-help"
-            className="mt-3 w-full sm:w-[13ch] h-16 rounded-lg border border-rule-strong bg-surface px-4 text-center font-mono text-[28px] font-bold uppercase tracking-code text-ink placeholder:text-rule-strong outline-none transition-colors focus:border-gold focus:ring-1 focus:ring-gold"
+            className="mt-3 w-full sm:w-[11ch] h-16 rounded-lg border border-rule-strong bg-surface px-4 text-center font-mono text-[28px] font-bold tabular-nums tracking-code text-ink placeholder:text-rule-strong outline-none transition-colors focus:border-gold focus:ring-1 focus:ring-gold"
           />
           <p id="code-help" className="sr-only">
-            Enter the five character attendance code
+            Enter the four digit attendance code
           </p>
         </section>
 
