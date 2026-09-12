@@ -257,7 +257,13 @@ export default function SessionPrep() {
               All sessions
             </Link>
             {draft && canPrepare && !isDraft && (
-              <Button variant="secondary" size="sm" onClick={() => prepare(true)} disabled={!!working}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => prepare(true)}
+                loading={working === 'prepare'}
+                disabled={!!working}
+              >
                 {working === 'prepare' ? 'Drafting' : 'Draft a fresh plan'}
               </Button>
             )}
@@ -280,7 +286,12 @@ export default function SessionPrep() {
             The planner reads which children you have taught, what they scored, and who the club has not seen lately, then drafts two or three focus groups with a hands-on activity each.
           </p>
           {canPrepare ? (
-            <Button className="mt-5" onClick={() => prepare(false)} disabled={!!working}>
+            <Button
+              className="mt-5"
+              onClick={() => prepare(false)}
+              loading={working === 'prepare'}
+              disabled={!!working}
+            >
               {working === 'prepare' ? 'Drafting — about ten seconds' : 'Draft my plan'}
             </Button>
           ) : (
@@ -314,12 +325,12 @@ export default function SessionPrep() {
                 <div className="flex flex-wrap items-center gap-2">
                   {editing ? (
                     <>
-                      <Button onClick={saveEdits} disabled={!!working}>{working === 'save' ? 'Saving' : 'Save changes'}</Button>
+                      <Button onClick={saveEdits} loading={working === 'save'} disabled={!!working}>{working === 'save' ? 'Saving' : 'Save changes'}</Button>
                       <Button variant="ghost" onClick={() => { setEditing(false); setEdits({}); }} disabled={!!working}>Cancel</Button>
                     </>
                   ) : (
                     <>
-                      <Button onClick={approve} disabled={!!working}>{working === 'approve' ? 'Approving' : 'Approve — I will teach this'}</Button>
+                      <Button onClick={approve} loading={working === 'approve'} disabled={!!working}>{working === 'approve' ? 'Approving' : 'Approve — I will teach this'}</Button>
                       <Button variant="secondary" onClick={() => setEditing(true)} disabled={!!working}>Edit first</Button>
                       <Button variant="ghost" onClick={() => setRejecting(true)} disabled={!!working}>Reject</Button>
                     </>
@@ -341,7 +352,7 @@ export default function SessionPrep() {
                     />
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="danger" onClick={reject} disabled={!!working || !reason.trim()}>{working === 'reject' ? 'Rejecting' : 'Reject draft'}</Button>
+                    <Button variant="danger" onClick={reject} loading={working === 'reject'} disabled={!!working || !reason.trim()}>{working === 'reject' ? 'Rejecting' : 'Reject draft'}</Button>
                     <Button variant="ghost" onClick={() => { setRejecting(false); setReason(''); }} disabled={!!working}>Back</Button>
                   </div>
                 </div>

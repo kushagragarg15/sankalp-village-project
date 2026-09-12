@@ -95,6 +95,36 @@ export default {
           from: { transform: 'scaleY(0)' },
           to: { transform: 'scaleY(1)' },
         },
+        // The rule under a working button. The shape is the whole point, so
+        // it is timed `linear` and the surge is written into the stops rather
+        // than left to an easing curve: most of the bar is laid down in the
+        // first half second, then it creeps and never quite lands. A request
+        // that finishes quickly — nearly all of them — reads as "that was
+        // fast", and a slow one still looks like it is nearly there instead of
+        // frozen. The button coming back is what completion looks like; the
+        // bar must never reach the end on its own and promise otherwise.
+        'work-fill': {
+          '0%': { transform: 'scaleX(0.04)' },
+          '8%': { transform: 'scaleX(0.40)' },
+          '20%': { transform: 'scaleX(0.62)' },
+          '35%': { transform: 'scaleX(0.75)' },
+          '55%': { transform: 'scaleX(0.85)' },
+          '75%': { transform: 'scaleX(0.91)' },
+          '100%': { transform: 'scaleX(0.96)' },
+        },
+        // Three dots keeping time under the label, so a long wait still has a
+        // heartbeat after the rule has slowed to a crawl.
+        'work-dot': {
+          '0%, 100%': { opacity: '0.25' },
+          '40%': { opacity: '1' },
+        },
+        // A segment travelling the length of a track: the page-level loader,
+        // which used to only fade in place.
+        'rule-sweep': {
+          '0%': { transform: 'translateX(-100%) scaleX(0.7)' },
+          '50%': { transform: 'translateX(100%) scaleX(1.15)' },
+          '100%': { transform: 'translateX(300%) scaleX(0.7)' },
+        },
       },
       animation: {
         'rule-pulse': 'rule-pulse 1.6s ease-in-out infinite',
@@ -103,6 +133,9 @@ export default {
         'rise-in': 'rise-in 640ms cubic-bezier(0.16, 1, 0.3, 1) both',
         'mark-in': 'mark-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both',
         'grow-down': 'grow-down 600ms cubic-bezier(0.16, 1, 0.3, 1) both',
+        'work-fill': 'work-fill 5.5s linear both',
+        'work-dot': 'work-dot 1.05s ease-in-out infinite',
+        'rule-sweep': 'rule-sweep 1.4s cubic-bezier(0.65, 0, 0.35, 1) infinite',
       },
     },
   },

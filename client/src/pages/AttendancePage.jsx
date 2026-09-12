@@ -272,7 +272,7 @@ export default function AttendancePage() {
           title="Register for this session first"
           description="Attendance is recorded against the volunteers on the session list, and you are not on it yet. Add yourself and the form opens straight away."
           action={
-            <Button variant="live" size="lg" onClick={handleRegister} disabled={joining}>
+            <Button variant="live" size="lg" onClick={handleRegister} loading={joining}>
               {joining ? 'Registering' : 'Register for this session'}
             </Button>
           }
@@ -469,7 +469,7 @@ export default function AttendancePage() {
           >
             Cancel
           </Button>
-          <Button type="submit" variant="live" size="lg" disabled={submitting}>
+          <Button type="submit" variant="live" size="lg" loading={submitting}>
             {submitting ? 'Recording' : 'Record attendance'}
           </Button>
         </div>

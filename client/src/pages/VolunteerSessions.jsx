@@ -108,7 +108,7 @@ export default function VolunteerSessions() {
                     <Button
                       variant={state === 'live' ? 'live' : 'secondary'}
                       onClick={() => handleRegister(session)}
-                      disabled={registering === session._id}
+                      loading={registering === session._id}
                     >
                       {registering === session._id ? 'Registering' : 'Register'}
                     </Button>

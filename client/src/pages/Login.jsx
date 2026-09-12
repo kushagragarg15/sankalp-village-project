@@ -372,6 +372,15 @@ export default function Login() {
                   <SpinnerIcon />
                   Signing in
                 </span>
+                {/* The same filling rule the Button component carries, so the
+                    first thing anyone sees waiting and every wait after it
+                    speak the same language. */}
+                {loading && (
+                  <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[2px]">
+                    <span className="absolute inset-0 bg-current opacity-[0.18]" />
+                    <span className="absolute inset-0 origin-left bg-current animate-work-fill" />
+                  </span>
+                )}
               </button>
             </form>
 

@@ -246,7 +246,7 @@ export default function StudentProgress() {
             <Button type="button" variant="secondary" onClick={() => setShowModal(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={saving}>
+            <Button type="submit" loading={saving}>
               {saving ? 'Saving' : 'Save score'}
             </Button>
           </div>

@@ -227,7 +227,7 @@ export default function Students() {
             <Button type="button" variant="secondary" onClick={() => setShowModal(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={saving}>
+            <Button type="submit" loading={saving}>
               {saving ? 'Adding' : 'Add student'}
             </Button>
           </div>

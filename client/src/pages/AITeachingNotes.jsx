@@ -103,7 +103,7 @@ export default function AITeachingNotes() {
             rows={3}
           />
 
-          <Button type="submit" disabled={loading} className="w-full">
+          <Button type="submit" loading={loading} className="w-full">
             {loading ? 'Drafting' : 'Draft a plan'}
           </Button>
 

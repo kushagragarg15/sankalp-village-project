@@ -135,7 +135,7 @@ export default function AIActivity() {
       <PageHeader
         title="AI activity"
         lede="What the assistant was asked and what it looked up, how volunteers judged the drafted plans, and how the evals are trending. Read from the audit trail, not sampled."
-        actions={<Button variant="secondary" size="sm" onClick={load} disabled={loading}>{loading ? 'Refreshing' : 'Refresh'}</Button>}
+        actions={<Button variant="secondary" size="sm" onClick={load} loading={loading}>{loading ? 'Refreshing' : 'Refresh'}</Button>}
       />
 
       {error && (

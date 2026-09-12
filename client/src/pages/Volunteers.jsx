@@ -317,7 +317,7 @@ export default function Volunteers() {
             <Button type="button" variant="secondary" onClick={() => setShowAdd(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={saving}>
+            <Button type="submit" loading={saving}>
               {saving ? 'Adding' : 'Add member'}
             </Button>
           </div>
@@ -344,7 +344,7 @@ export default function Volunteers() {
           <Button variant="secondary" onClick={() => setPendingRole(null)}>
             Cancel
           </Button>
-          <Button onClick={handleRoleChange} disabled={saving}>
+          <Button onClick={handleRoleChange} loading={saving}>
             {saving ? 'Saving' : 'Confirm'}
           </Button>
         </div>

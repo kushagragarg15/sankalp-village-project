@@ -214,7 +214,7 @@ export default function AdminSessions() {
             <Button type="button" variant="secondary" onClick={() => setOpenDialog(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={busy}>
+            <Button type="submit" loading={busy}>
               {busy ? 'Opening' : 'Open session'}
             </Button>
           </div>
@@ -236,7 +236,7 @@ export default function AdminSessions() {
           <Button variant="secondary" onClick={() => setPendingDelete(null)}>
             Keep it
           </Button>
-          <Button variant="danger" onClick={handleDelete} disabled={busy}>
+          <Button variant="danger" onClick={handleDelete} loading={busy}>
             {busy ? 'Deleting' : 'Delete session'}
           </Button>
         </div>

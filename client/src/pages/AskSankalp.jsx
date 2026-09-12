@@ -473,7 +473,12 @@ export default function AskSankalp() {
                 disabled={loading || restoring}
                 className="max-h-40 min-h-[2.5rem] flex-1 resize-none bg-transparent px-2.5 py-2 text-[15px] text-ink placeholder:text-ink-3 focus:outline-none disabled:opacity-60"
               />
-              <Button type="submit" size="md" disabled={loading || restoring || !input.trim()}>
+              <Button
+                type="submit"
+                size="md"
+                loading={loading}
+                disabled={restoring || !input.trim()}
+              >
                 {loading ? 'Thinking' : 'Ask'}
               </Button>
             </div>
