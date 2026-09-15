@@ -8,6 +8,13 @@
       "when": 1789465266036,
       "tag": "0000_thankful_ravenous",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789481991782,
+      "tag": "0001_curly_newton_destine",
+      "breakpoints": true
     }
   ]
 }

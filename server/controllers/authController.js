@@ -23,7 +23,8 @@ const publicUser = (user) => ({
   name: user.name,
   email: user.email,
   role: user.role,
-  phone: user.phone
+  phone: user.phone,
+  isSuperAdmin: user.isSuperAdmin
 });
 
 const generateToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });

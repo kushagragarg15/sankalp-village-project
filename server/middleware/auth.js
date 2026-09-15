@@ -19,7 +19,7 @@ const loadUser = async (id) => {
 
   const db = getDb();
   const [row] = await db
-    .select({ id: users.id, name: users.name, email: users.email, role: users.role, phone: users.phone })
+    .select({ id: users.id, name: users.name, email: users.email, role: users.role, phone: users.phone, isSuperAdmin: users.isSuperAdmin })
     .from(users)
     .where(eq(users.id, id))
     .limit(1);

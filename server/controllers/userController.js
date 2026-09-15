@@ -14,6 +14,7 @@ const PUBLIC_COLUMNS = {
   name: users.name,
   email: users.email,
   role: users.role,
+  isSuperAdmin: users.isSuperAdmin,
   phone: users.phone,
   googleId: users.googleId,
   createdAt: users.createdAt,
@@ -71,6 +72,12 @@ exports.createUser = async (req, res, next) => {
       return res.status(400).json({ success: false, message: `Role must be one of: ${ROLES.join(', ')}` });
     }
 
+    // Creating an account straight into the admin role is still granting
+    // admin access — the same restriction updateUser applies to promotions.
+    if (role === 'admin' && !req.user.isSuperAdmin) {
+      return res.status(403).json({ success: false, message: 'Only a super admin can create a coordinator account.' });
+    }
+
     const db = getDb();
     const normalised = String(email).toLowerCase().trim();
     const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, normalised)).limit(1);
@@ -101,6 +108,12 @@ exports.updateUser = async (req, res, next) => {
   try {
     if (req.body.role && !ROLES.includes(req.body.role)) {
       return res.status(400).json({ success: false, message: `Role must be one of: ${ROLES.join(', ')}` });
+    }
+
+    // Deciding who is admin and who is volunteer is a super-admin-only
+    // action; a regular admin can still edit a member's name/email/phone.
+    if (typeof req.body.role === 'string' && !req.user.isSuperAdmin) {
+      return res.status(403).json({ success: false, message: 'Only a super admin can change someone’s role.' });
     }
 
     // An admin must not be able to remove their own admin rights and lock the

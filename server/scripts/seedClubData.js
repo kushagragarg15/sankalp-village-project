@@ -14,11 +14,21 @@
 require('dotenv').config();
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
-const { eq, isNull, isNotNull } = require('drizzle-orm');
+const { eq, and, or, inArray, isNull, isNotNull } = require('drizzle-orm');
 
 const { connectPG } = require('../db/pool');
 const { getDb } = require('../db');
-const { users, students, attendanceSessions, registrations, teachingLogs, quizScores } = require('../db/schema');
+const {
+  users,
+  students,
+  attendanceSessions,
+  registrations,
+  teachingLogs,
+  quizScores,
+  resources,
+  agentRuns,
+  lessonPlanDrafts
+} = require('../db/schema');
 const { parseGradeNumber } = require('../utils/grade');
 
 // The term being reconstructed. Nothing is written after TODAY.
@@ -65,7 +75,7 @@ const code = () => {
 // --- the people -------------------------------------------------------------
 
 // LNMIIT students who volunteer. Roll numbers avoid the real accounts already
-// in the database.
+// in the database. Capped at 25.
 const VOLUNTEERS = [
   ['Aditya Joshi', '23ucc501'],
   ['Ishita Agarwal', '23ucs512'],
@@ -81,27 +91,38 @@ const VOLUNTEERS = [
   ['Tanvi Bhatnagar', '25ucs173'],
   ['Yash Sisodia', '25uec189'],
   ['Manasi Kulkarni', '25ucc194'],
+  ['Aryan Rathi', '23uec537'],
+  ['Kritika Soni', '23ucc545'],
+  ['Varun Kachhawaha', '23ucs556'],
+  ['Ishaan Tripathi', '24ucc289'],
+  ['Simran Kaur', '24ucs298'],
+  ['Rohan Bhandari', '24uec267'],
+  ['Pallavi Shekhawat', '25ucc205'],
+  ['Nakul Agnihotri', '25ucs216'],
+  ['Diya Chaturvedi', '25uec223'],
+  ['Aakash Solanki', '26ucc112'],
+  ['Muskan Rajpurohit', '26ucs124'],
+];
+
+// Coordinators (role: admin). Capped at 6 — role management itself is
+// restricted to whoever has isSuperAdmin (see the super-admin block below).
+const ADMINS = [
+  ['Vikas Poddar', '22ucc430'],
+  ['Shalini Deora', '22ucs445'],
+  ['Rajat Khandelwal', '22uec412'],
+  ['Neha Sisodiya', '23ucc478'],
+  ['Manish Rathore', '23ucs489'],
+  ['Priyanka Vaishnav', '23uec495'],
 ];
 
 // Children from the villages around Jamdoli, with surnames common there.
+// Capped at 10.
 const STUDENTS = [
   ['Aarti Meena', 'Class 5'], ['Rohit Gurjar', 'Class 4'],
   ['Sunita Bairwa', 'Class 6'], ['Kailash Saini', 'Class 3'],
   ['Pooja Yadav', 'Class 7'], ['Mahesh Jat', 'Class 5'],
   ['Nisha Sharma', 'Class 8'], ['Deepak Kumawat', 'Class 4'],
   ['Manju Regar', 'Class 2'], ['Sanjay Meena', 'Class 6'],
-  ['Kavita Mali', 'Class 3'], ['Ramesh Prajapat', 'Class 7'],
-  ['Anita Gurjar', 'Class 5'], ['Vikram Bairwa', 'Class 8'],
-  ['Sarita Nai', 'Class 2'], ['Dinesh Choudhary', 'Class 4'],
-  ['Rekha Meena', 'Class 6'], ['Mukesh Saini', 'Class 1'],
-  ['Priya Jat', 'Class 5'], ['Gopal Banjara', 'Class 3'],
-  ['Seema Kumawat', 'Class 7'], ['Naresh Mali', 'Class 4'],
-  ['Lalita Gurjar', 'Class 2'], ['Hemant Meena', 'Class 8'],
-  ['Babita Regar', 'Class 6'], ['Suresh Yadav', 'Class 1'],
-  ['Kamla Bairwa', 'Class 3'], ['Arjun Prajapat', 'Class 5'],
-  ['Meena Saini', 'Class 4'], ['Bhagwan Meena', 'Class 7'],
-  ['Radha Choudhary', 'Class 2'], ['Om Prakash Jat', 'Class 6'],
-  ['Sushila Nai', 'Class 1'], ['Jitendra Gurjar', 'Class 8'],
 ];
 
 // Topics that suit the class being taught, so the register reads like a real
@@ -189,22 +210,37 @@ async function seed() {
   const db = getDb();
   console.log('Connected to PostgreSQL\n');
 
-  // --- clear, preserving real sign-ins -------------------------------------
-  const realMembers = await db.select({ name: users.name, email: users.email, role: users.role }).from(users).where(isNotNull(users.googleId));
+  // --- clear, preserving real sign-ins and any super admin -----------------
+  // A super admin is a real, durable grant (not demo data) even before they
+  // have ever signed in with Google, so it must survive a reseed too.
+  const demoUserFilter = and(isNull(users.googleId), eq(users.isSuperAdmin, false));
+  const realMembers = await db
+    .select({ name: users.name, email: users.email, role: users.role })
+    .from(users)
+    .where(or(isNotNull(users.googleId), eq(users.isSuperAdmin, true)));
+  const demoUserIds = (await db.select({ id: users.id }).from(users).where(demoUserFilter)).map((r) => r.id);
 
-  // Children before the parents they reference; non-Google users deleted last.
+  // Children before the parents they reference; non-Google, non-super-admin
+  // users deleted last. agent_runs/lesson_plan_drafts and resource authorship
+  // reference users too (no cascade) — clear those first or the user delete
+  // hits a foreign-key violation.
   await db.delete(teachingLogs);
   await db.delete(registrations);
   await db.delete(attendanceSessions);
   await db.delete(students); // quiz_scores cascade with their student
-  const removedUsers = await db.delete(users).where(isNull(users.googleId)).returning({ id: users.id });
+  if (demoUserIds.length > 0) {
+    await db.update(resources).set({ createdBy: null }).where(inArray(resources.createdBy, demoUserIds));
+    await db.delete(agentRuns).where(inArray(agentRuns.userId, demoUserIds)); // agent_run_steps cascade
+    await db.delete(lessonPlanDrafts).where(inArray(lessonPlanDrafts.volunteerId, demoUserIds));
+  }
+  const removedUsers = await db.delete(users).where(demoUserFilter).returning({ id: users.id });
 
   console.log(`Cleared demo data. Removed ${removedUsers.length} seeded accounts.`);
-  console.log(`Preserved ${realMembers.length} real members who sign in with Google:`);
+  console.log(`Preserved ${realMembers.length} real/super-admin accounts:`);
   realMembers.forEach((m) => console.log(`   ${m.role.padEnd(10)} ${m.email}`));
   console.log('');
 
-  // --- volunteers -----------------------------------------------------------
+  // --- volunteers and coordinators ------------------------------------------
   const hashed = await bcrypt.hash(DEMO_PASSWORD, 10);
   const volunteerDocs = await db
     .insert(users)
@@ -219,13 +255,26 @@ async function seed() {
     )
     .returning();
 
+  const adminDocs = await db
+    .insert(users)
+    .values(
+      ADMINS.map(([name, roll]) => ({
+        name,
+        email: `${roll}@lnmiit.ac.in`,
+        passwordHash: hashed,
+        role: 'admin',
+        phone: `9${between(1, 9)}${String(between(10000000, 99999999))}`,
+      }))
+    )
+    .returning();
+
   // Real members teach too, so the register is not made only of seeded people.
   const realTeaching = await db.select({ id: users.id }).from(users).where(isNotNull(users.googleId));
   const teachers = [...volunteerDocs, ...realTeaching];
   const [adminRow] = await db.select({ id: users.id }).from(users).where(eq(users.role, 'admin')).limit(1);
-  const admin = adminRow || volunteerDocs[0];
+  const admin = adminRow || adminDocs[0] || volunteerDocs[0];
 
-  console.log(`Created ${volunteerDocs.length} volunteer accounts.`);
+  console.log(`Created ${volunteerDocs.length} volunteer accounts and ${adminDocs.length} coordinator accounts.`);
 
   // --- students -------------------------------------------------------------
   // Most enrolled as the club started; a few joined as word spread.
@@ -440,8 +489,8 @@ async function seed() {
 
   console.log(`\nRecorded quiz scores for ${quizzed} students.`);
   console.log(`Total: ${logRows.length} lessons across ${sessionRows.length} sessions.`);
-  console.log(`\nSeeded volunteers sign in with: ${DEMO_PASSWORD}`);
-  console.log('Real members keep using Google sign-in.');
+  console.log(`\nSeeded volunteers and coordinators sign in with: ${DEMO_PASSWORD}`);
+  console.log('Real members and any super admin keep using their existing sign-in.');
 
   process.exit(0);
 }

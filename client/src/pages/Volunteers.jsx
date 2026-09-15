@@ -31,6 +31,7 @@ export default function Volunteers() {
   const [pendingRole, setPendingRole] = useState(null);
   const { user } = useAuth();
   const toast = useToast();
+  const canManageRoles = !!user?.isSuperAdmin;
 
   const load = async () => {
     try {
@@ -194,8 +195,8 @@ export default function Volunteers() {
         <h2 className="type-title mb-1.5 text-[15px] text-ink">Coordinators</h2>
         <p className="mb-4 text-[13px] text-ink-2 max-w-[62ch]">
           Coordinators open sessions, read out the attendance code, and see the
-          full attendance report. Signing in never changes anyone&rsquo;s role — it
-          is granted here.
+          full attendance report. Signing in never changes anyone&rsquo;s role
+          {canManageRoles ? ' — it is granted here.' : '; only a super admin can change it.'}
         </p>
 
         <ul className="divide-y divide-rule border-y border-rule">
@@ -217,11 +218,12 @@ export default function Volunteers() {
                 </div>
 
                 <div className="flex items-center gap-3 shrink-0">
+                  {member.isSuperAdmin && <Badge variant="default">Super admin</Badge>}
                   <Badge variant={isAdmin ? 'recorded' : 'quiet'}>
                     {isAdmin ? 'Coordinator' : 'Volunteer'}
                   </Badge>
 
-                  {isSelf ? (
+                  {!canManageRoles || isSelf || member.isSuperAdmin ? (
                     <span className="text-[13px] text-ink-3">—</span>
                   ) : (
                     <button
@@ -289,14 +291,20 @@ export default function Volunteers() {
             required
           />
 
-          <Select
-            label="Role"
-            value={form.role}
-            onChange={(e) => setForm({ ...form, role: e.target.value })}
-          >
-            <option value="volunteer">Volunteer — teaches and records attendance</option>
-            <option value="admin">Coordinator — also opens sessions and reads reports</option>
-          </Select>
+          {canManageRoles ? (
+            <Select
+              label="Role"
+              value={form.role}
+              onChange={(e) => setForm({ ...form, role: e.target.value })}
+            >
+              <option value="volunteer">Volunteer — teaches and records attendance</option>
+              <option value="admin">Coordinator — also opens sessions and reads reports</option>
+            </Select>
+          ) : (
+            <p className="text-[13px] text-ink-2">
+              Added as a volunteer. Only a super admin can add someone directly as a coordinator.
+            </p>
+          )}
 
           <Input
             label="Phone"

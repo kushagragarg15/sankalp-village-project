@@ -44,6 +44,11 @@ const users = pgTable(
     passwordHash: text('password_hash'),
     googleId: text('google_id'),
     role: text('role').notNull().default('volunteer'),
+    // Separate from `role` on purpose: an admin with this set can grant or
+    // revoke admin/volunteer status on other accounts; a plain admin cannot.
+    // Keeping it a flag on top of 'admin' (rather than a third role value)
+    // means every existing authorize('admin') route keeps working unchanged.
+    isSuperAdmin: boolean('is_super_admin').notNull().default(false),
     phone: text('phone').notNull().default(''),
     ...timestamps
   },
