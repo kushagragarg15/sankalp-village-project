@@ -35,6 +35,10 @@ app.use(cors({
   maxAge: 86400
 }));
 
+// Unauthenticated, no DB touch — for an uptime monitor to ping and keep the
+// Render free-tier instance from sleeping after 15 minutes idle.
+app.get('/health', (req, res) => res.status(200).json({ status: 'ok' }));
+
 // Mount routers
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
