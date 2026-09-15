@@ -50,12 +50,14 @@ async def provider_error_handler(request: Request, exc: ProviderError):
     return JSONResponse(status_code=status, content=exc.to_dict(), headers=headers)
 
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health():
     """
     Public, unauthenticated — an infra/uptime probe, not a data endpoint.
     Reports the same two things server/db/pool.js's connectPG() checks:
-    that PostgreSQL is reachable, and that pgvector is installed.
+    that PostgreSQL is reachable, and that pgvector is installed. GET and
+    HEAD both work — FastAPI doesn't add HEAD to a plain @app.get route on
+    its own, and some uptime monitors send HEAD to save bandwidth.
     """
     try:
         db_status = await check_health(app.state.pool)
