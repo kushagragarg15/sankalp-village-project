@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { GoogleOAuthProvider, GoogleLogin, useGoogleOAuth } from '@react-oauth/google';
+import DotGrid from '../components/DotGrid';
 import logoImage from '../assets/sankalp-logo.jpg';
 
 // A faint ruled surface for the board panels — the same structural idea as
@@ -228,6 +229,23 @@ export default function Login() {
           className="relative hidden overflow-hidden bg-board p-12 text-paper lg:flex lg:flex-col lg:justify-between xl:p-16"
           style={BOARD_TEXTURE}
         >
+          {/* Sits under the ruled-line texture and the copy (both `relative`,
+              so they paint above this un-z-indexed absolute layer by DOM
+              order). Board tones only — gold stays reserved for the live dot. */}
+          <div className="absolute inset-0">
+            <DotGrid
+              dotSize={3}
+              gap={26}
+              baseColor="#2A3A35"
+              activeColor="#5C716A"
+              proximity={110}
+              shockRadius={180}
+              shockStrength={1.5}
+              resistance={800}
+              returnDuration={1.1}
+            />
+          </div>
+
           <div className="relative flex animate-rise-in items-center gap-3">
             <img src={logoImage} alt="" className="h-9 w-9 rounded object-cover" />
             <span className="type-title text-[16px] text-paper">Sankalp Club</span>
