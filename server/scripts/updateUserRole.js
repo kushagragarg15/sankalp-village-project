@@ -1,16 +1,18 @@
-const mongoose = require('mongoose');
-const User = require('../models/User');
+const { eq } = require('drizzle-orm');
+const { connectPG } = require('../db/pool');
+const { getDb } = require('../db');
+const { users } = require('../db/schema');
 require('dotenv').config({ path: './.env' });
 
 const updateUserRole = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log('Connected to MongoDB');
+    await connectPG();
+    console.log('Connected to PostgreSQL');
+    const db = getDb();
 
     const email = '23ucc564@lnmiit.ac.in';
 
-    // Find and update the user
-    const user = await User.findOne({ email });
+    const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
     if (!user) {
       console.log(`❌ User with email ${email} not found`);
@@ -20,13 +22,11 @@ const updateUserRole = async () => {
     console.log(`Found user: ${user.name} (${user.email})`);
     console.log(`Current role: ${user.role}`);
 
-    // Update role to admin
-    user.role = 'admin';
-    await user.save();
+    await db.update(users).set({ role: 'admin' }).where(eq(users.id, user.id));
 
-    console.log(`✅ Updated role to: ${user.role}`);
+    console.log('✅ Updated role to: admin');
     console.log('\nPlease log out and log back in to see the changes.');
-    
+
     process.exit(0);
   } catch (error) {
     console.error('Error updating user role:', error);

@@ -24,8 +24,9 @@ const spend = [aiRateLimit, aiDailyBudget];
 // Generate teaching notes with RAG
 router.post('/generate-notes', spend, generateTeachingNotes);
 
-// Tool-using agent over club data. Any signed-in member may ask; which tools the
-// agent gets is decided by role inside agentService, not by this route.
+// Tool-using agent over club data (LangGraph, in ai-service). Any signed-in
+// member may ask; which tools the agent gets is decided by role inside
+// ai-service, not by this route — Node only forwards the trusted user context.
 router.post('/ask', spend, askAgent);
 router.post('/ask/stream', spend, askAgentStream);
 

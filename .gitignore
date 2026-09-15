@@ -3,6 +3,9 @@ node_modules/
 package-lock.json
 yarn.lock
 pnpm-lock.yaml
+ai-service/.venv/
+__pycache__/
+*.pyc
 
 # Environment variables
 .env

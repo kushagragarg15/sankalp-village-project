@@ -1,28 +1,29 @@
 require('dotenv').config();
-const mongoose = require('mongoose');
-const User = require('../models/User');
+const { connectPG } = require('../db/pool');
+const { getDb } = require('../db');
+const { users } = require('../db/schema');
 
 const listUsers = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log('Connected to MongoDB');
+    await connectPG();
+    const db = getDb();
 
-    const users = await User.find().select('name email role googleId');
-    
+    const rows = await db.select({ name: users.name, email: users.email, role: users.role, googleId: users.googleId }).from(users);
+
     console.log('\n=== Current Users in Database ===\n');
-    
-    if (users.length === 0) {
+
+    if (rows.length === 0) {
       console.log('No users found in database.');
     } else {
-      users.forEach((user, index) => {
+      rows.forEach((user, index) => {
         console.log(`${index + 1}. ${user.name}`);
         console.log(`   Email: ${user.email}`);
         console.log(`   Role: ${user.role}`);
         console.log(`   Google ID: ${user.googleId ? 'Yes' : 'No'}`);
         console.log('');
       });
-      
-      console.log(`Total users: ${users.length}`);
+
+      console.log(`Total users: ${rows.length}`);
     }
 
     process.exit(0);

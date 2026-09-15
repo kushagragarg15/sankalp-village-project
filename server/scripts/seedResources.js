@@ -1,9 +1,10 @@
-// Load env vars first: llmClient picks its provider when it is required.
+// Load env vars first.
 require('dotenv').config();
 
-const connectDB = require('../config/db');
-const Resource = require('../models/Resource');
-const { processResourceContent, EMBEDDING_MODEL } = require('../services/embeddingService');
+const { connectPG } = require('../db/pool');
+const { getDb } = require('../db');
+const { resources } = require('../db/schema');
+const { callAiService, SYSTEM_USER } = require('../services/aiServiceClient');
 
 // Sample teaching resources covering different subjects and grades
 const sampleResources = [
@@ -553,27 +554,26 @@ Remember: The best teaching often happens in imperfect circumstances with passio
 async function seedResources() {
   try {
     console.log('Connecting to database...');
-    await connectDB();
+    await connectPG();
+    const db = getDb();
 
     console.log('Clearing existing resources...');
-    await Resource.deleteMany({});
+    await db.delete(resources); // resource_chunks cascade-deletes with their parent
 
-    console.log(`\nProcessing and embedding resources with ${EMBEDDING_MODEL} (this may take a minute)...\n`);
+    console.log('\nProcessing and embedding resources via the ai-service (this may take a minute)...\n');
 
     for (const resourceData of sampleResources) {
       console.log(`Processing: ${resourceData.title}`);
-      
-      // Process content: chunk and embed
-      const chunks = await processResourceContent(resourceData.content);
-      
-      console.log(`  ✓ Created ${chunks.length} chunks with embeddings`);
 
-      // Create resource with embedded chunks
-      await Resource.create({
-        ...resourceData,
-        chunks,
-        embeddingModel: EMBEDDING_MODEL
+      // Chunking + embedding + storage all happen in the Python ai-service
+      // now (app/rag/ingest.py) — the only place a resource's chunks are written.
+      const result = await callAiService('/rag/resources', {
+        method: 'POST',
+        user: SYSTEM_USER,
+        body: resourceData
       });
+
+      console.log(`  ✓ Created ${result.chunks} chunks with embeddings (${result.embeddingModel})`);
     }
 
     console.log('\n✅ Successfully seeded resources!');

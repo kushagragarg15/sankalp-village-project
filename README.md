@@ -44,7 +44,8 @@ Sankalp is a full-stack web application designed to coordinate weekend teaching 
 
 ### Prerequisites
 - Node.js (v16 or higher)
-- MongoDB (local or MongoDB Atlas)
+- PostgreSQL with the `pgvector` extension (local or hosted — Neon/Supabase both have it on free tiers)
+- Python 3.11+ (for `ai-service`, the RAG/agent backend)
 - npm or yarn
 
 ### Installation
@@ -61,7 +62,7 @@ Create a `.env` file in the `server` directory:
 ```env
 NODE_ENV=development
 PORT=5000
-MONGO_URI=mongodb://localhost:27017/sankalp-village-project
+DATABASE_URL=postgres://user:password@localhost:5432/sankalp
 JWT_SECRET=your_secure_jwt_secret_key
 CLIENT_URL=http://localhost:5173
 # AI features (optional). Groq for chat, Gemini for embeddings is the free setup.
@@ -69,7 +70,12 @@ GROQ_API_KEY=your_groq_key
 GEMINI_API_KEY=your_gemini_key
 LLM_PROVIDER=groq
 EMBEDDING_PROVIDER=gemini
+# ai-service (Python) — required for the AI features specifically, not the rest of the app.
+AI_SERVICE_URL=http://localhost:8000
+AI_SERVICE_TOKEN=some_shared_secret
 ```
+
+Create a `.env` file in the `ai-service` directory (see `ai-service/.env.example`) — `DATABASE_URL` and `AI_SERVICE_TOKEN` must match the server's exactly, plus the same provider keys.
 
 3. **Install dependencies**
 
@@ -85,23 +91,37 @@ cd ../client
 npm install
 ```
 
-4. **Seed the database**
+AI service:
 ```bash
-cd server
-npm run create-test-data   # Creates test volunteer accounts and students
-npm run seed-resources     # Seeds teaching resources + embeddings for RAG (needs an embedding provider key)
+cd ../ai-service
+python -m venv .venv
+.venv/Scripts/activate   # .venv/bin/activate on macOS/Linux
+pip install -r requirements.txt
 ```
 
-This creates 15 test volunteer accounts and 15 students. Attendance sessions are created from the app (admin UI), and no admin account is seeded — see **Demo Credentials** below for how to get admin access.
+4. **Set up and seed the database**
+```bash
+cd server
+npm run db:migrate         # applies the PostgreSQL schema (pgvector extension, tables, indexes)
+npm run seed-club-data      # a term's worth of sessions, volunteers and students
+npm run seed-resources      # teaching resources + embeddings for RAG (needs an embedding provider key; run after ai-service is set up)
+```
 
-5. **Start the application**
+Attendance sessions are created from the app (admin UI) beyond what the seed writes, and no admin account is seeded — see **Demo Credentials** below for how to get admin access.
 
-Backend (from `server` directory):
+5. **Start the application** (three processes)
+
+AI service (from `ai-service`, with its venv activated):
+```bash
+uvicorn app.main:app --reload --port 8000
+```
+
+Backend (from `server`, in a new terminal):
 ```bash
 npm run dev
 ```
 
-Frontend (from `client` directory, in a new terminal):
+Frontend (from `client`, in a new terminal):
 ```bash
 npm run dev
 ```
@@ -109,6 +129,7 @@ npm run dev
 6. **Access the application**
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:5000
+- AI service: http://localhost:8000 (not exposed to the browser — Node proxies to it)
 
 ## Demo Credentials
 

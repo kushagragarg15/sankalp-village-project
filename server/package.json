@@ -20,7 +20,10 @@
     "prep-next-session": "node scripts/prepNextSession.js",
     "eval:retrieval": "cross-env RAG_QUIET=1 node evals/retrieval.js",
     "eval:generation": "cross-env RAG_QUIET=1 node evals/generation.js",
-    "mcp": "node mcp/server.js"
+    "mcp": "node mcp/server.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node scripts/migratePg.js",
+    "migrate-to-pg": "node scripts/migrateToPg.js"
   },
   "keywords": [
     "education",
@@ -36,15 +39,18 @@
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
+    "drizzle-orm": "^0.45.2",
     "express": "^4.19.2",
     "google-auth-library": "^11.0.2",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.3.2",
     "openai": "^4.38.5",
+    "pg": "^8.23.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "cross-env": "^10.1.0",
+    "drizzle-kit": "^0.31.10",
     "nodemon": "^3.1.0"
   }
 }

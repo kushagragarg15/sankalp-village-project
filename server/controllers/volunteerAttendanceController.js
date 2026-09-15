@@ -1,34 +1,32 @@
-const TeachingLog = require('../models/TeachingLog');
-const User = require('../models/User');
+const { eq, desc, sql } = require('drizzle-orm');
+const { getDb } = require('../db');
+const { teachingLogs, users, attendanceSessions, students } = require('../db/schema');
 
 /**
- * Sessions attended, per volunteer, in ONE round trip.
- *
- * This replaces a `TeachingLog.distinct()` call per volunteer. That pattern
- * cost 1 + N round trips to Atlas (~30ms each), so it grew linearly with the
- * number of volunteers no matter how little data there was.
+ * Sessions attended, per volunteer, in ONE round trip — a `GROUP BY` over
+ * distinct (volunteer, session) pairs, same shape as the two-stage Mongo
+ * aggregation it replaces.
  *
  * Returns a Map of volunteerId -> distinct session count.
  */
-const sessionCountsByVolunteer = async () => {
-  const rows = await TeachingLog.aggregate([
-    // One entry per (volunteer, session) pair...
-    { $group: { _id: { volunteerId: '$volunteerId', sessionId: '$sessionId' } } },
-    // ...then count the pairs per volunteer.
-    { $group: { _id: '$_id.volunteerId', sessionsAttended: { $sum: 1 } } }
-  ]);
-
-  return new Map(rows.map((row) => [String(row._id), row.sessionsAttended]));
+const sessionCountsByVolunteer = async (db) => {
+  const rows = await db.execute(sql`
+    SELECT volunteer_id, COUNT(DISTINCT session_id)::int AS sessions_attended
+    FROM ${teachingLogs}
+    GROUP BY volunteer_id
+  `);
+  return new Map(rows.rows.map((row) => [String(row.volunteer_id), row.sessions_attended]));
 };
 
 // Ranked highest-first, with volunteers who have taught nothing included at 0.
 const rankVolunteers = (volunteers, counts) => {
   const ranked = volunteers.map((volunteer) => ({
-    _id: volunteer._id,
+    _id: volunteer.id,
+    id: volunteer.id,
     name: volunteer.name,
     email: volunteer.email,
     phone: volunteer.phone,
-    sessionsAttended: counts.get(String(volunteer._id)) || 0
+    sessionsAttended: counts.get(String(volunteer.id)) || 0
   }));
 
   ranked.sort((a, b) => b.sessionsAttended - a.sessionsAttended);
@@ -40,32 +38,27 @@ const rankVolunteers = (volunteers, counts) => {
 };
 
 // Fold a volunteer's logs into one entry per session.
-const groupLogsBySession = (logs) => {
+const groupLogsBySession = (rows) => {
   const groups = new Map();
 
-  for (const log of logs) {
-    const session = log.sessionId;
-    if (!session?._id) continue;
+  for (const row of rows) {
+    const session = row.session;
+    if (!session?.id) continue;
 
-    const key = String(session._id);
+    const key = String(session.id);
     if (!groups.has(key)) {
       groups.set(key, {
-        session: {
-          id: session._id,
-          title: session.title,
-          startTime: session.startTime,
-          endTime: session.endTime
-        },
+        session: { id: session.id, title: session.title, startTime: session.startTime, endTime: session.endTime },
         students: [],
-        submittedAt: log.timestamp
+        submittedAt: row.log.loggedAt
       });
     }
 
     groups.get(key).students.push({
-      name: log.studentId?.name,
-      grade: log.studentId?.grade,
-      subject: log.subject,
-      topic: log.topic
+      name: row.student?.name,
+      grade: row.student?.grade,
+      subject: row.log.subject,
+      topic: row.log.topic
     });
   }
 
@@ -77,18 +70,15 @@ const groupLogsBySession = (logs) => {
 // @access  Private (Admin only)
 exports.getAllVolunteerAttendance = async (req, res, next) => {
   try {
+    const db = getDb();
     const [volunteers, counts] = await Promise.all([
-      User.find({ role: 'volunteer' }).select('name email phone').lean(),
-      sessionCountsByVolunteer()
+      db.select({ id: users.id, name: users.name, email: users.email, phone: users.phone }).from(users).where(eq(users.role, 'volunteer')),
+      sessionCountsByVolunteer(db)
     ]);
 
     const volunteerStats = rankVolunteers(volunteers, counts);
 
-    res.status(200).json({
-      success: true,
-      count: volunteerStats.length,
-      data: volunteerStats
-    });
+    res.status(200).json({ success: true, count: volunteerStats.length, data: volunteerStats });
   } catch (error) {
     next(error);
   }
@@ -99,22 +89,22 @@ exports.getAllVolunteerAttendance = async (req, res, next) => {
 // @access  Private
 exports.getMyAttendance = async (req, res, next) => {
   try {
-    const [logs, volunteers, counts] = await Promise.all([
-      TeachingLog.find({ volunteerId: req.user.id })
-        .populate('sessionId', 'title startTime endTime')
-        .populate('studentId', 'name grade')
-        .sort({ timestamp: -1 })
-        .lean(),
-      User.find({ role: 'volunteer' }).select('_id').lean(),
-      sessionCountsByVolunteer()
+    const db = getDb();
+    const [rows, volunteers, counts] = await Promise.all([
+      db
+        .select({ log: teachingLogs, session: attendanceSessions, student: students })
+        .from(teachingLogs)
+        .leftJoin(attendanceSessions, eq(teachingLogs.sessionId, attendanceSessions.id))
+        .leftJoin(students, eq(teachingLogs.studentId, students.id))
+        .where(eq(teachingLogs.volunteerId, req.user.id))
+        .orderBy(desc(teachingLogs.loggedAt)),
+      db.select({ id: users.id }).from(users).where(eq(users.role, 'volunteer')),
+      sessionCountsByVolunteer(db)
     ]);
 
-    const attendanceHistory = groupLogsBySession(logs);
-
-    // Rank comes from the same single aggregation, rather than replaying the
-    // whole leaderboard with one query per volunteer.
+    const attendanceHistory = groupLogsBySession(rows);
     const ranked = rankVolunteers(volunteers, counts);
-    const mine = ranked.find((v) => String(v._id) === String(req.user.id));
+    const mine = ranked.find((v) => String(v.id) === String(req.user.id));
 
     res.status(200).json({
       success: true,
@@ -135,35 +125,34 @@ exports.getMyAttendance = async (req, res, next) => {
 // @access  Private (Admin only)
 exports.getVolunteerAttendance = async (req, res, next) => {
   try {
-    const [volunteer, logs] = await Promise.all([
-      User.findById(req.params.volunteerId).select('name email phone').lean(),
-      TeachingLog.find({ volunteerId: req.params.volunteerId })
-        .populate('sessionId', 'title startTime endTime')
-        .populate('studentId', 'name grade')
-        .sort({ timestamp: -1 })
-        .lean()
+    const db = getDb();
+    const [[volunteer], rows] = await Promise.all([
+      db
+        .select({ id: users.id, name: users.name, email: users.email, phone: users.phone })
+        .from(users)
+        .where(eq(users.id, req.params.volunteerId))
+        .limit(1),
+      db
+        .select({ log: teachingLogs, session: attendanceSessions, student: students })
+        .from(teachingLogs)
+        .leftJoin(attendanceSessions, eq(teachingLogs.sessionId, attendanceSessions.id))
+        .leftJoin(students, eq(teachingLogs.studentId, students.id))
+        .where(eq(teachingLogs.volunteerId, req.params.volunteerId))
+        .orderBy(desc(teachingLogs.loggedAt))
     ]);
 
     if (!volunteer) {
-      return res.status(404).json({
-        success: false,
-        message: 'Volunteer not found'
-      });
+      return res.status(404).json({ success: false, message: 'Volunteer not found' });
     }
 
-    const attendanceHistory = groupLogsBySession(logs);
+    const attendanceHistory = groupLogsBySession(rows);
 
     res.status(200).json({
       success: true,
       data: {
-        volunteer: {
-          id: volunteer._id,
-          name: volunteer.name,
-          email: volunteer.email,
-          phone: volunteer.phone
-        },
+        volunteer: { id: volunteer.id, name: volunteer.name, email: volunteer.email, phone: volunteer.phone },
         totalSessions: attendanceHistory.length,
-        totalStudentsTaught: logs.length,
+        totalStudentsTaught: rows.length,
         attendanceHistory
       }
     });

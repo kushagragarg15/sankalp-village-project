@@ -1,30 +1,47 @@
-// Global error handler middleware
+// Global error handler middleware.
+//
+// Was written against Mongoose's error shapes (CastError, code 11000,
+// ValidationError). Now maps the PostgreSQL error codes `pg` throws instead,
+// keeping the same response shape and, where practical, the same status code
+// a given failure used to produce.
 const errorHandler = (err, req, res, next) => {
-  let error = { ...err };
-  error.message = err.message;
+  let error = { message: err.message };
 
-  // Log to console for dev
   console.error(err);
 
-  // Mongoose bad ObjectId
-  if (err.name === 'CastError') {
-    const message = 'Resource not found';
-    error = { message, statusCode: 404 };
+  // drizzle-orm's node-postgres driver wraps the raw `pg` error (which carries
+  // the Postgres error code) in `DrizzleQueryError.cause` rather than copying
+  // `code` onto itself.
+  const code = err.code || err.cause?.code;
+
+  switch (code) {
+    // invalid_text_representation — e.g. "not-a-uuid" passed where a uuid
+    // column/param was expected. Mongoose's equivalent (a malformed ObjectId)
+    // was a CastError that this handler turned into a 404.
+    case '22P02':
+      error = { message: 'Resource not found', statusCode: 404 };
+      break;
+    // unique_violation
+    case '23505':
+      error = { message: 'Duplicate field value entered', statusCode: 400 };
+      break;
+    // foreign_key_violation
+    case '23503':
+      error = { message: 'Referenced record does not exist', statusCode: 400 };
+      break;
+    // not_null_violation
+    case '23502':
+      error = { message: `${err.column || 'A required field'} is required`, statusCode: 400 };
+      break;
+    // check_violation
+    case '23514':
+      error = { message: 'Value violates a database constraint', statusCode: 400 };
+      break;
+    default:
+      break;
   }
 
-  // Mongoose duplicate key
-  if (err.code === 11000) {
-    const message = 'Duplicate field value entered';
-    error = { message, statusCode: 400 };
-  }
-
-  // Mongoose validation error
-  if (err.name === 'ValidationError') {
-    const message = Object.values(err.errors).map(val => val.message);
-    error = { message, statusCode: 400 };
-  }
-
-  res.status(error.statusCode || 500).json({
+  res.status(error.statusCode || err.statusCode || 500).json({
     success: false,
     message: error.message || 'Server Error',
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack })

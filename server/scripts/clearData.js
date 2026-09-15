@@ -1,35 +1,32 @@
-const mongoose = require('mongoose');
-const User = require('../models/User');
-const Student = require('../models/Student');
-const AttendanceSession = require('../models/AttendanceSession');
-const Registration = require('../models/Registration');
-const TeachingLog = require('../models/TeachingLog');
+const { connectPG } = require('../db/pool');
+const { getDb } = require('../db');
+const { users, students, attendanceSessions, registrations, teachingLogs } = require('../db/schema');
 require('dotenv').config({ path: './.env' });
 
 const clearAllData = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log('Connected to MongoDB');
+    await connectPG();
+    const db = getDb();
 
-    // Clear all collections
-    await User.deleteMany({});
-    console.log('✓ Cleared all users');
+    // Children before the parents they reference.
+    await db.delete(teachingLogs);
+    console.log('✓ Cleared all teaching logs');
 
-    await Student.deleteMany({});
-    console.log('✓ Cleared all students');
-
-    await AttendanceSession.deleteMany({});
-    console.log('✓ Cleared all attendance sessions');
-
-    await Registration.deleteMany({});
+    await db.delete(registrations);
     console.log('✓ Cleared all registrations');
 
-    await TeachingLog.deleteMany({});
-    console.log('✓ Cleared all teaching logs');
+    await db.delete(attendanceSessions);
+    console.log('✓ Cleared all attendance sessions');
+
+    await db.delete(students); // quiz_scores cascade with their student
+    console.log('✓ Cleared all students');
+
+    await db.delete(users);
+    console.log('✓ Cleared all users');
 
     console.log('\n✅ All data cleared successfully!');
     console.log('Database is now empty and ready for production use.');
-    
+
     process.exit(0);
   } catch (error) {
     console.error('Error clearing data:', error);

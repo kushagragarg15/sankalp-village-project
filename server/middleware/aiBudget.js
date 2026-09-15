@@ -1,16 +1,15 @@
-const AgentRun = require('../models/AgentRun');
-const LessonPlanDraft = require('../models/LessonPlanDraft');
+const { sql } = require('drizzle-orm');
+const { getDb } = require('../db');
+const { agentRuns, lessonPlanDrafts } = require('../db/schema');
 
 /**
  * Two guardrails in front of every endpoint that spends model tokens.
  *
- * 1. A per-user request rate limit (sliding window, in memory). Stops a stuck
- *    client or an enthusiastic tester from burning the free-tier minute for
- *    everyone else — the provider limit is shared by the whole club.
+ * 1. A per-user request rate limit (sliding window, in memory).
  * 2. A per-user daily token budget, computed from what the audit trail says
- *    they already spent today (AgentRun + LessonPlanDraft usage). Persisted
- *    usage means the budget survives a restart, and the same numbers show on
- *    the admin AI-activity page — one source of truth.
+ *    they already spent today (agent_runs + lesson_plan_drafts usage).
+ *    Persisted usage means the budget survives a restart, and the same
+ *    numbers show on the admin AI-activity page — one source of truth.
  *
  * Both answer 429 with a Retry-After the client can show. Admins are not
  * exempt: the point is the shared quota, not trust.
@@ -19,14 +18,11 @@ const LessonPlanDraft = require('../models/LessonPlanDraft');
 const RATE_LIMIT = Number(process.env.AI_RATE_LIMIT_REQUESTS || 12);
 const RATE_WINDOW_MS = Number(process.env.AI_RATE_LIMIT_WINDOW_MS || 5 * 60 * 1000);
 const DAILY_TOKEN_BUDGET = Number(process.env.AI_DAILY_TOKEN_BUDGET_PER_USER || 150000);
-// The budget check is one aggregate (~30ms on Atlas); cache it briefly so a
-// chatty session does not pay that on every message.
 const BUDGET_CACHE_MS = 30 * 1000;
 
 const windows = new Map(); // userId -> [timestamps]
 const budgetCache = new Map(); // userId -> { spent, expires }
 
-// Keep both maps from growing without bound on a long-lived process.
 setInterval(() => {
   const now = Date.now();
   for (const [id, stamps] of windows) {
@@ -46,24 +42,27 @@ const startOfToday = () => {
 /** Tokens this user has spent since midnight, from the persisted audit rows. */
 async function tokensSpentToday(userId) {
   const since = startOfToday();
-  const [agent, prep] = await Promise.all([
-    AgentRun.aggregate([
-      { $match: { userId, createdAt: { $gte: since } } },
-      { $group: { _id: null, t: { $sum: { $add: ['$usage.promptTokens', '$usage.completionTokens'] } } } }
-    ]),
-    LessonPlanDraft.aggregate([
-      { $match: { volunteerId: userId, createdAt: { $gte: since } } },
-      { $group: { _id: null, t: { $sum: { $add: ['$usage.promptTokens', '$usage.completionTokens'] } } } }
-    ])
+  const db = getDb();
+  const [agentRow, prepRow] = await Promise.all([
+    db
+      .execute(
+        sql`SELECT COALESCE(SUM(prompt_tokens + completion_tokens), 0)::int AS t FROM ${agentRuns} WHERE user_id = ${userId} AND created_at >= ${since}`
+      )
+      .then((r) => r.rows[0]),
+    db
+      .execute(
+        sql`SELECT COALESCE(SUM(prompt_tokens + completion_tokens), 0)::int AS t FROM ${lessonPlanDrafts} WHERE volunteer_id = ${userId} AND created_at >= ${since}`
+      )
+      .then((r) => r.rows[0])
   ]);
-  return (agent[0]?.t || 0) + (prep[0]?.t || 0);
+  return (agentRow?.t || 0) + (prepRow?.t || 0);
 }
 
 /** Forget the cached spend for a user — call after a run is persisted. */
 const invalidateBudget = (userId) => budgetCache.delete(String(userId));
 
 exports.aiRateLimit = (req, res, next) => {
-  const id = String(req.user._id);
+  const id = String(req.user.id);
   const now = Date.now();
   const stamps = (windows.get(id) || []).filter((t) => now - t < RATE_WINDOW_MS);
 
@@ -83,12 +82,11 @@ exports.aiRateLimit = (req, res, next) => {
 
 exports.aiDailyBudget = async (req, res, next) => {
   try {
-    const id = String(req.user._id);
+    const id = String(req.user.id);
     const cached = budgetCache.get(id);
-    const spent = cached && cached.expires > Date.now() ? cached.spent : await tokensSpentToday(req.user._id);
+    const spent = cached && cached.expires > Date.now() ? cached.spent : await tokensSpentToday(req.user.id);
     budgetCache.set(id, { spent, expires: Date.now() + BUDGET_CACHE_MS });
 
-    // Surfaced so the client can warn before the wall, not after.
     res.set('X-AI-Tokens-Used-Today', String(spent));
     res.set('X-AI-Tokens-Budget', String(DAILY_TOKEN_BUDGET));
 

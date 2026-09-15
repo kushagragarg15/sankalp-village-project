@@ -1,25 +1,37 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const { eq } = require('drizzle-orm');
+const { getDb } = require('../db');
+const { users } = require('../db/schema');
 
-// This middleware runs on every protected request, so its database lookup used
-// to add a full Atlas round trip (~30ms) plus the user's unbounded `attendance`
-// array to every single call. We cache the small projected user for a few
-// seconds instead; a client polling every 30s then pays for it once, not twice.
+// Same reasoning as before the migration: this middleware runs on every
+// protected request, so a full round trip on every call is worth avoiding.
+// Cache the small projected user for a few seconds.
 const USER_CACHE_TTL_MS = Number(process.env.USER_CACHE_TTL_MS || 15000);
 const userCache = new Map();
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const loadUser = async (id) => {
   const hit = userCache.get(id);
   if (hit && hit.expires > Date.now()) return hit.user;
 
-  const doc = await User.findById(id).select('name email role phone').lean();
-  if (!doc) {
+  if (!UUID_RE.test(id)) return null;
+
+  const db = getDb();
+  const [row] = await db
+    .select({ id: users.id, name: users.name, email: users.email, role: users.role, phone: users.phone })
+    .from(users)
+    .where(eq(users.id, id))
+    .limit(1);
+
+  if (!row) {
     userCache.delete(id);
     return null;
   }
 
-  // Controllers read `req.user.id`, which a lean document does not provide.
-  const user = { ...doc, id: String(doc._id) };
+  // Controllers read `req.user.id` and (via the pre-migration Mongoose shape)
+  // `req.user._id`; keep both.
+  const user = { ...row, _id: row.id };
   userCache.set(id, { user, expires: Date.now() + USER_CACHE_TTL_MS });
   return user;
 };
@@ -28,7 +40,6 @@ const loadUser = async (id) => {
 // masked by the cache.
 const invalidateUser = (id) => userCache.delete(String(id));
 
-// Keep the map from growing without bound on a long-lived process.
 setInterval(() => {
   const now = Date.now();
   for (const [id, entry] of userCache) {
@@ -93,3 +104,4 @@ exports.authorize = (...roles) => {
 };
 
 exports.invalidateUser = invalidateUser;
+exports.UUID_RE = UUID_RE;

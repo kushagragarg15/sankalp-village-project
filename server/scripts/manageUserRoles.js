@@ -1,6 +1,8 @@
 require('dotenv').config();
-const mongoose = require('mongoose');
-const User = require('../models/User');
+const { eq, asc } = require('drizzle-orm');
+const { connectPG } = require('../db/pool');
+const { getDb } = require('../db');
+const { users } = require('../db/schema');
 const readline = require('readline');
 
 const rl = readline.createInterface({
@@ -10,33 +12,32 @@ const rl = readline.createInterface({
 
 const question = (query) => new Promise((resolve) => rl.question(query, resolve));
 
-const listUsers = async () => {
-  const users = await User.find().select('name email role').sort({ email: 1 });
-  
+const listUsers = async (db) => {
+  const rows = await db.select({ id: users.id, name: users.name, email: users.email, role: users.role }).from(users).orderBy(asc(users.email));
+
   console.log('\n=== Current Users ===\n');
-  users.forEach((user, index) => {
+  rows.forEach((user, index) => {
     const roleDisplay = user.role === 'admin' ? '👑 ADMIN' : '👤 VOLUNTEER';
     console.log(`${index + 1}. ${user.name}`);
     console.log(`   Email: ${user.email}`);
     console.log(`   Role: ${roleDisplay}`);
     console.log('');
   });
-  
-  return users;
+
+  return rows;
 };
 
-const changeUserRole = async (email, newRole) => {
-  const user = await User.findOne({ email });
-  
+const changeUserRole = async (db, email, newRole) => {
+  const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+
   if (!user) {
     console.log(`❌ User with email ${email} not found.`);
     return false;
   }
-  
+
   const oldRole = user.role;
-  user.role = newRole;
-  await user.save();
-  
+  await db.update(users).set({ role: newRole }).where(eq(users.id, user.id));
+
   console.log(`\n✅ Successfully updated ${user.name}`);
   console.log(`   ${oldRole} → ${newRole}`);
   return true;
@@ -44,8 +45,9 @@ const changeUserRole = async (email, newRole) => {
 
 const main = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log('✅ Connected to MongoDB\n');
+    await connectPG();
+    console.log('✅ Connected to PostgreSQL\n');
+    const db = getDb();
 
     while (true) {
       console.log('\n╔════════════════════════════════════╗');
@@ -61,12 +63,12 @@ const main = async () => {
 
       switch (choice.trim()) {
         case '1':
-          await listUsers();
+          await listUsers(db);
           await question('\nPress Enter to continue...');
           break;
 
         case '2':
-          await listUsers();
+          await listUsers(db);
           const email = await question('\nEnter user email: ');
           console.log('\nAvailable roles:');
           console.log('  - admin');
@@ -76,22 +78,22 @@ const main = async () => {
           if (role !== 'admin' && role !== 'volunteer') {
             console.log('❌ Invalid role. Must be "admin" or "volunteer"');
           } else {
-            await changeUserRole(email.trim(), role.trim());
+            await changeUserRole(db, email.trim(), role.trim());
           }
           await question('\nPress Enter to continue...');
           break;
 
         case '3':
-          await listUsers();
+          await listUsers(db);
           const adminEmail = await question('\nEnter user email to make admin: ');
-          await changeUserRole(adminEmail.trim(), 'admin');
+          await changeUserRole(db, adminEmail.trim(), 'admin');
           await question('\nPress Enter to continue...');
           break;
 
         case '4':
-          await listUsers();
+          await listUsers(db);
           const volunteerEmail = await question('\nEnter user email to make volunteer: ');
-          await changeUserRole(volunteerEmail.trim(), 'volunteer');
+          await changeUserRole(db, volunteerEmail.trim(), 'volunteer');
           await question('\nPress Enter to continue...');
           break;
 

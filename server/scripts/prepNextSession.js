@@ -6,13 +6,12 @@
 //   npm run prep-next-session            # next session that has not ended
 //   npm run prep-next-session -- <id>    # a specific session
 //
-// Load env first: llmClient picks its provider when it is required.
 require('dotenv').config();
 
-const connectDB = require('../config/db');
-const AttendanceSession = require('../models/AttendanceSession');
-const Registration = require('../models/Registration');
-const User = require('../models/User');
+const { eq, gt, inArray, asc } = require('drizzle-orm');
+const { connectPG } = require('../db/pool');
+const { getDb } = require('../db');
+const { attendanceSessions, registrations, users } = require('../db/schema');
 const { prepareSession } = require('../services/sessionPrepService');
 const { CHAT_PROVIDER, CHAT_MODEL, isConfigured, notConfiguredMessage } = require('../services/llmClient');
 
@@ -21,22 +20,31 @@ async function main() {
     console.error(notConfiguredMessage());
     process.exit(1);
   }
-  await connectDB();
+  await connectPG();
+  const db = getDb();
 
   const requestedId = process.argv[2];
-  const session = requestedId
-    ? await AttendanceSession.findById(requestedId).lean()
-    : await AttendanceSession.findOne({ endTime: { $gt: new Date() } }).sort({ startTime: 1 }).lean();
+  let session;
+  if (requestedId) {
+    [session] = await db.select().from(attendanceSessions).where(eq(attendanceSessions.id, requestedId)).limit(1);
+  } else {
+    [session] = await db
+      .select()
+      .from(attendanceSessions)
+      .where(gt(attendanceSessions.endTime, new Date()))
+      .orderBy(asc(attendanceSessions.startTime))
+      .limit(1);
+  }
 
   if (!session) {
     console.log('No upcoming session to prepare for.');
     process.exit(0);
   }
 
-  const registrations = await Registration.find({ sessionId: session._id }).select('userId').lean();
-  const volunteers = await User.find({ _id: { $in: registrations.map((r) => r.userId) } })
-    .select('name email role')
-    .lean();
+  const regs = await db.select({ userId: registrations.userId }).from(registrations).where(eq(registrations.sessionId, session.id));
+  const volunteers = regs.length
+    ? await db.select({ id: users.id, name: users.name, email: users.email, role: users.role }).from(users).where(inArray(users.id, regs.map((r) => r.userId)))
+    : [];
 
   console.log(`Session: ${session.title} (${new Date(session.startTime).toLocaleString('en-IN')})`);
   console.log(`Registered volunteers: ${volunteers.length}. Model: ${CHAT_PROVIDER}/${CHAT_MODEL}\n`);

@@ -1,11 +1,14 @@
-const Resource = require('../models/Resource');
-const { processResourceContent } = require('../services/embeddingService');
-const { generateLessonPlan } = require('../services/ragService');
-const { runAgent } = require('../services/agentService');
-const { isConfigured, notConfiguredMessage, EMBEDDING_MODEL } = require('../services/llmClient');
+const crypto = require('crypto');
+const { pipeline } = require('stream/promises');
+const { Readable } = require('stream');
+const { eq, and, ne, asc, desc, inArray, sql } = require('drizzle-orm');
+const { getDb } = require('../db');
+const { resources, agentRuns, agentRunSteps } = require('../db/schema');
+const { withId } = require('../db/serialize');
+const { UUID_RE } = require('../middleware/auth');
+const { isConfigured, notConfiguredMessage } = require('../services/llmClient');
 const { invalidateBudget } = require('../middleware/aiBudget');
-const mongoose = require('mongoose');
-const AgentRun = require('../models/AgentRun');
+const { callAiService, streamAiService, translateAiServiceError } = require('../services/aiServiceClient');
 
 /**
  * Two accepted shapes for a question:
@@ -14,28 +17,12 @@ const AgentRun = require('../models/AgentRun');
  * A conversationId, when given, must be a valid id; ownership is enforced when
  * history is loaded (only this user's runs are read).
  */
-/**
- * A 429 from the provider, in words a volunteer can act on. Distinguishes an
- * empty balance (waiting will not help) from a per-minute or per-day limit
- * (it will), and says how long when the provider told us.
- */
-function providerBusyMessage(error) {
-  const msg = error.message || '';
-  if (/no credits|insufficient_quota|billing details/i.test(msg)) {
-    return 'The AI service has no credits left. Ask the coordinator to top up the provider account.';
-  }
-  const secs = error.retryAfterMs ? Math.ceil(error.retryAfterMs / 1000) : null;
-  const when = !secs ? 'in a minute' : secs < 90 ? `in about ${secs} seconds` : `in about ${Math.ceil(secs / 60)} minutes`;
-  const daily = /per day|TPD|RPD/i.test(msg) ? " The club's daily AI allowance with this provider is used up for now." : '';
-  return `The AI provider is busy. Try again ${when}.${daily}`;
-}
-
 function parseAskBody(body = {}) {
   if (typeof body.question === 'string') {
     const question = body.question.trim();
     if (!question) return { error: 'question must not be empty' };
     if (body.conversationId !== undefined && body.conversationId !== null && body.conversationId !== '') {
-      if (!mongoose.isValidObjectId(body.conversationId)) return { error: 'conversationId is not valid' };
+      if (!UUID_RE.test(String(body.conversationId))) return { error: 'conversationId is not valid' };
       return { question, conversationId: String(body.conversationId) };
     }
     return { question };
@@ -59,30 +46,22 @@ exports.generateTeachingNotes = async (req, res, next) => {
     const { topic, grade, subject, extraInstructions } = req.body;
 
     if (!topic) {
-      return res.status(400).json({
-        success: false,
-        message: 'Topic is required'
-      });
+      return res.status(400).json({ success: false, message: 'Topic is required' });
     }
 
     if (!subject || !grade) {
-      return res.status(400).json({
-        success: false,
-        message: 'Subject and grade are required'
-      });
+      return res.status(400).json({ success: false, message: 'Subject and grade are required' });
     }
 
-    // Check if OpenAI API key is configured
     if (!isConfigured()) {
       return res.status(503).json({ success: false, message: notConfiguredMessage() });
     }
 
-    // Generate lesson plan using RAG
-    const result = await generateLessonPlan({
-      topic,
-      subject,
-      grade,
-      extraInstructions
+    const result = await callAiService('/rag/lesson-plan', {
+      method: 'POST',
+      user: req.user,
+      body: { topic, subject, grade, extra_instructions: extraInstructions || '' },
+      timeoutMs: 60000
     });
 
     res.status(200).json({
@@ -98,23 +77,9 @@ exports.generateTeachingNotes = async (req, res, next) => {
     });
   } catch (error) {
     console.error('Error in generateTeachingNotes:', error);
-    
-    // Handle specific error messages from RAG service
-    if (/Invalid .*API key/i.test(error.message)) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid API key for the LLM provider'
-      });
-    }
-
-    if (/rate limit/i.test(error.message)) {
-      return res.status(429).json({
-        success: false,
-        message: 'LLM rate limit exceeded. Please try again later.'
-      });
-    }
-
-    next(error);
+    const translated = translateAiServiceError(error);
+    if (translated.retryAfterMs) res.set('Retry-After', String(Math.ceil(translated.retryAfterMs / 1000)));
+    res.status(translated.status).json({ success: false, message: translated.message });
   }
 };
 
@@ -126,37 +91,28 @@ exports.createResource = async (req, res, next) => {
     const { title, subject, grade, content } = req.body;
 
     if (!title || !subject || !grade || !content) {
-      return res.status(400).json({
-        success: false,
-        message: 'Title, subject, grade, and content are required'
-      });
+      return res.status(400).json({ success: false, message: 'Title, subject, grade, and content are required' });
     }
 
-    // Check if OpenAI API key is configured
     if (!isConfigured()) {
       return res.status(503).json({ success: false, message: notConfiguredMessage() });
     }
 
-    // Process content: chunk and embed
-    const chunks = await processResourceContent(content);
-
-    // Create resource with embedded chunks, recording which model produced them
-    const resource = await Resource.create({
-      title,
-      subject,
-      grade,
-      content,
-      chunks,
-      embeddingModel: EMBEDDING_MODEL,
-      createdBy: req.user._id
+    // Chunking + embedding + storage all happen in the Python ai-service now
+    // (app/rag/ingest.py) — the only place a resource's chunks are written.
+    const result = await callAiService('/rag/resources', {
+      method: 'POST',
+      user: req.user,
+      body: { title, subject, grade, content }
     });
 
     res.status(201).json({
       success: true,
-      data: resource
+      data: { _id: result.id, id: result.id, title: result.title, subject: result.subject, grade: result.grade, chunks: result.chunks }
     });
   } catch (error) {
     console.error('Error creating resource:', error);
+    if (error.status) return res.status(error.status).json({ success: false, message: error.message });
     next(error);
   }
 };
@@ -167,20 +123,17 @@ exports.createResource = async (req, res, next) => {
 exports.getResources = async (req, res, next) => {
   try {
     const { subject, grade } = req.query;
-    
-    const filter = {};
-    if (subject) filter.subject = { $regex: new RegExp(subject, 'i') };
-    if (grade) filter.grade = { $regex: new RegExp(grade, 'i') };
+    const db = getDb();
 
-    const resources = await Resource.find(filter)
-      .select('-chunks') // Don't return embeddings in list view
-      .sort('-createdAt');
+    const conditions = [];
+    if (subject) conditions.push(sql`${resources.subject} ILIKE ${'%' + subject + '%'}`);
+    if (grade) conditions.push(sql`${resources.grade} ILIKE ${'%' + grade + '%'}`);
 
-    res.status(200).json({
-      success: true,
-      count: resources.length,
-      data: resources
-    });
+    let query = db.select().from(resources);
+    if (conditions.length > 0) query = query.where(and(...conditions));
+    const rows = await query.orderBy(desc(resources.createdAt));
+
+    res.status(200).json({ success: true, count: rows.length, data: rows.map(withId) });
   } catch (error) {
     console.error('Error fetching resources:', error);
     next(error);
@@ -189,7 +142,7 @@ exports.getResources = async (req, res, next) => {
 
 // @desc    Ask the tool-using agent a question about the club's data
 // @route   POST /api/ai/ask
-// @access  Private (tools are scoped to req.user.role inside the service)
+// @access  Private (tools are scoped to req.user.role inside ai-service)
 exports.askAgent = async (req, res, next) => {
   try {
     const input = parseAskBody(req.body);
@@ -199,23 +152,22 @@ exports.askAgent = async (req, res, next) => {
       return res.status(503).json({ success: false, message: notConfiguredMessage() });
     }
 
-    const result = await runAgent({ ...input, user: req.user });
-    invalidateBudget(req.user._id);
+    const requestId = crypto.randomUUID();
+    const result = await callAiService('/agent/ask', {
+      method: 'POST',
+      user: req.user,
+      body: input,
+      timeoutMs: 60000,
+      requestId
+    });
+    invalidateBudget(req.user.id);
 
     res.status(200).json({ success: true, data: result });
   } catch (error) {
     console.error('Error in askAgent:', error);
-
-    if (error.status === 401 || /Invalid .*API key/i.test(error.message)) {
-      return res.status(401).json({ success: false, message: 'Invalid API key for the LLM provider' });
-    }
-    // OpenAI answers 429 for both a burst limit and an empty balance; only one
-    // of those is fixed by waiting.
-    if (error.status === 429 || error.message.includes('rate limit')) {
-      return res.status(429).json({ success: false, message: providerBusyMessage(error) });
-    }
-
-    next(error);
+    const translated = translateAiServiceError(error);
+    if (translated.retryAfterMs) res.set('Retry-After', String(Math.ceil(translated.retryAfterMs / 1000)));
+    res.status(translated.status).json({ success: false, message: translated.message });
   }
 };
 
@@ -223,12 +175,9 @@ exports.askAgent = async (req, res, next) => {
 // @route   POST /api/ai/ask/stream
 // @access  Private
 //
-// Events (one JSON object per `data:` line):
-//   { type: 'token', text }              a piece of the answer
-//   { type: 'retract' }                  discard the text so far (it was a tool turn)
-//   { type: 'tool_start' | 'tool_end' }  progress, for the "looking up…" line
-//   { type: 'done', ...result }          the same payload /ask returns
-//   { type: 'error', message }
+// ai-service runs the LangGraph agent and streams its own SSE response;
+// this just opens that connection and pipes the bytes straight through to
+// the browser as they arrive — the answer is never assembled in Node.
 exports.askAgentStream = async (req, res, next) => {
   const input = parseAskBody(req.body);
   if (input.error) return res.status(400).json({ success: false, message: input.error });
@@ -236,33 +185,52 @@ exports.askAgentStream = async (req, res, next) => {
     return res.status(503).json({ success: false, message: notConfiguredMessage() });
   }
 
+  const requestId = crypto.randomUUID();
+  const abortController = new AbortController();
+  req.on('close', () => abortController.abort());
+
+  let upstream;
+  try {
+    // Failures here (validation, a provider error before any token streamed,
+    // ai-service unreachable) happen before any SSE header is sent, so a
+    // normal JSON error response is correct — same as the old guardrail
+    // checks above returning plain 400/503 rather than an SSE `error` event.
+    upstream = await streamAiService('/agent/ask/stream', {
+      user: req.user,
+      body: input,
+      requestId,
+      signal: abortController.signal
+    });
+  } catch (error) {
+    console.error('Error opening askAgentStream:', error);
+    const translated = translateAiServiceError(error);
+    if (translated.retryAfterMs) res.set('Retry-After', String(Math.ceil(translated.retryAfterMs / 1000)));
+    return res.status(translated.status).json({ success: false, message: translated.message });
+  }
+
   res.set({
     'Content-Type': 'text/event-stream; charset=utf-8',
     'Cache-Control': 'no-cache, no-transform',
     Connection: 'keep-alive',
-    'X-Accel-Buffering': 'no' // tell nginx-style proxies not to buffer
+    'X-Accel-Buffering': 'no'
   });
   res.flushHeaders();
 
-  let closed = false;
-  req.on('close', () => { closed = true; });
-  const send = (event) => {
-    if (!closed) res.write(`data: ${JSON.stringify(event)}\n\n`);
-  };
-
   try {
-    const result = await runAgent({ ...input, user: req.user, onEvent: send });
-    invalidateBudget(req.user._id);
-    send({ type: 'done', ...result });
+    await pipeline(Readable.fromWeb(upstream.body), res);
   } catch (error) {
-    console.error('Error in askAgentStream:', error);
-    const message =
-      error.status === 429 || /rate limit/i.test(error.message)
-        ? providerBusyMessage(error)
-        : 'That did not go through. Try again in a moment.';
-    send({ type: 'error', message });
+    // The connection to ai-service dropped mid-stream (not a provider error —
+    // those already arrived as an in-band `error` event from ai-service
+    // itself). Tell the browser and close, same contract as before.
+    console.error('Error piping askAgentStream:', error);
+    if (!res.writableEnded) {
+      res.write(`data: ${JSON.stringify({ type: 'error', message: 'That did not go through. Try again in a moment.' })}\n\n`);
+      res.end();
+    }
   } finally {
-    if (!closed) res.end();
+    // ai-service persists the run itself (success or failure) before the
+    // stream ends, so the cached budget figure is stale either way.
+    invalidateBudget(req.user.id);
   }
 };
 
@@ -271,28 +239,28 @@ exports.askAgentStream = async (req, res, next) => {
 // @access  Private
 exports.listConversations = async (req, res, next) => {
   try {
-    // Only answered turns make a conversation; a question that hit a rate
-    // limit or an error left nothing to come back to.
-    const rows = await AgentRun.aggregate([
-      { $match: { userId: req.user._id, conversationId: { $exists: true }, answer: { $ne: '' } } },
-      { $sort: { createdAt: 1 } },
-      {
-        $group: {
-          _id: '$conversationId',
-          title: { $first: '$question' },
-          startedAt: { $first: '$createdAt' },
-          lastAt: { $last: '$createdAt' },
-          turns: { $sum: 1 }
-        }
-      },
-      { $sort: { lastAt: -1 } },
-      { $limit: 50 }
-    ]);
-    res.status(200).json({
-      success: true,
-      count: rows.length,
-      data: rows.map((r) => ({ id: r._id, title: r.title.slice(0, 120), startedAt: r.startedAt, lastAt: r.lastAt, turns: r.turns }))
-    });
+    const db = getDb();
+    const result = await db.execute(sql`
+      SELECT conversation_id,
+             (ARRAY_AGG(question ORDER BY created_at ASC))[1] AS title,
+             MIN(created_at) AS started_at,
+             MAX(created_at) AS last_at,
+             COUNT(*)::int AS turns
+      FROM ${agentRuns}
+      WHERE user_id = ${req.user.id} AND answer <> ''
+      GROUP BY conversation_id
+      ORDER BY MAX(created_at) DESC
+      LIMIT 50
+    `);
+
+    const data = result.rows.map((r) => ({
+      id: r.conversation_id,
+      title: String(r.title).slice(0, 120),
+      startedAt: r.started_at,
+      lastAt: r.last_at,
+      turns: r.turns
+    }));
+    res.status(200).json({ success: true, count: data.length, data });
   } catch (error) {
     next(error);
   }
@@ -303,14 +271,31 @@ exports.listConversations = async (req, res, next) => {
 // @access  Private (owner)
 exports.getConversation = async (req, res, next) => {
   try {
-    if (!mongoose.isValidObjectId(req.params.id)) {
+    if (!UUID_RE.test(req.params.id)) {
       return res.status(400).json({ success: false, message: 'conversationId is not valid' });
     }
-    const runs = await AgentRun.find({ userId: req.user._id, conversationId: req.params.id, answer: { $ne: '' } })
-      .sort({ createdAt: 1 })
-      .select('question answer status iterations durationMs llmMs usage steps createdAt error')
-      .lean();
+    const db = getDb();
+    const runs = await db
+      .select()
+      .from(agentRuns)
+      .where(and(eq(agentRuns.userId, req.user.id), eq(agentRuns.conversationId, req.params.id), ne(agentRuns.answer, '')))
+      .orderBy(asc(agentRuns.createdAt));
+
     if (runs.length === 0) return res.status(404).json({ success: false, message: 'Conversation not found' });
+
+    const stepsByRun = new Map();
+    if (runs.length > 0) {
+      const allSteps = await db
+        .select()
+        .from(agentRunSteps)
+        .where(inArray(agentRunSteps.runId, runs.map((r) => r.id)))
+        .orderBy(asc(agentRunSteps.iteration));
+      for (const s of allSteps) {
+        const key = String(s.runId);
+        if (!stepsByRun.has(key)) stepsByRun.set(key, []);
+        stepsByRun.get(key).push({ iteration: s.iteration, tool: s.tool, args: s.args, ok: s.ok, durationMs: s.durationMs, error: s.error || undefined });
+      }
+    }
 
     const messages = runs.flatMap((r) => [
       { role: 'user', content: r.question, at: r.createdAt },
@@ -320,11 +305,11 @@ exports.getConversation = async (req, res, next) => {
         status: r.status,
         at: r.createdAt,
         trace: {
-          steps: (r.steps || []).map(({ resultPreview, ...s }) => s),
+          steps: stepsByRun.get(String(r.id)) || [],
           iterations: r.iterations,
           durationMs: r.durationMs,
           llmMs: r.llmMs,
-          usage: r.usage
+          usage: { promptTokens: r.promptTokens, completionTokens: r.completionTokens }
         }
       }
     ]);
@@ -339,13 +324,18 @@ exports.getConversation = async (req, res, next) => {
 // @access  Private (owner)
 exports.deleteConversation = async (req, res, next) => {
   try {
-    if (!mongoose.isValidObjectId(req.params.id)) {
+    if (!UUID_RE.test(req.params.id)) {
       return res.status(400).json({ success: false, message: 'conversationId is not valid' });
     }
-    const { deletedCount } = await AgentRun.deleteMany({ userId: req.user._id, conversationId: req.params.id });
-    if (deletedCount === 0) return res.status(404).json({ success: false, message: 'Conversation not found' });
-    invalidateBudget(req.user._id);
-    res.status(200).json({ success: true, data: { deleted: deletedCount } });
+    const db = getDb();
+    const deleted = await db
+      .delete(agentRuns)
+      .where(and(eq(agentRuns.userId, req.user.id), eq(agentRuns.conversationId, req.params.id)))
+      .returning({ id: agentRuns.id });
+
+    if (deleted.length === 0) return res.status(404).json({ success: false, message: 'Conversation not found' });
+    invalidateBudget(req.user.id);
+    res.status(200).json({ success: true, data: { deleted: deleted.length } });
   } catch (error) {
     next(error);
   }

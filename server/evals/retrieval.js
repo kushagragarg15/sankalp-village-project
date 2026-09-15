@@ -6,15 +6,24 @@
 //   npm run eval:retrieval -- --k 3 --verbose    # show every query, not just misses
 //   npm run eval:retrieval -- --no-save          # do not record the run
 //
-// Reads evals/golden/retrieval.json. Writes an EvalRun per mode unless --no-save.
+// Reads evals/golden/retrieval.json. Writes an eval_runs row per mode unless --no-save.
 require('dotenv').config();
 
 const path = require('path');
-const connectDB = require('../config/db');
-const EvalRun = require('../models/EvalRun');
+const { desc, eq } = require('drizzle-orm');
+const { connectPG } = require('../db/pool');
+const { getDb } = require('../db');
+const { evalRuns } = require('../db/schema');
 const { retrieveContext } = require('../services/ragService');
-const { embedText } = require('../services/embeddingService');
+const { callAiService, SYSTEM_USER } = require('../services/aiServiceClient');
 const { EMBEDDING_PROVIDER, EMBEDDING_MODEL, SIMILARITY_THRESHOLD } = require('../services/llmClient');
+
+// Embedding now happens in the Python ai-service (app/rag/embeddings.py);
+// this just calls it, the same way retrieveContext does.
+const embedText = async (text) => {
+  const { embedding } = await callAiService('/rag/embed', { method: 'POST', user: SYSTEM_USER, body: { text } });
+  return embedding;
+};
 const { scoreQuery, aggregate, aggregateByKind } = require('./lib/metrics');
 
 const golden = require(path.join(__dirname, 'golden', 'retrieval.json'));
@@ -98,7 +107,8 @@ function printMode(mode, rows) {
 }
 
 async function main() {
-  await connectDB();
+  await connectPG();
+  const db = getDb();
   const started = Date.now();
   console.log(
     `Golden set: ${golden.queries.length} queries. Embeddings: ${EMBEDDING_PROVIDER}/${EMBEDDING_MODEL}. Modes: ${MODES.join(', ')}.`
@@ -114,10 +124,15 @@ async function main() {
   const previous = SAVE
     ? Object.fromEntries(
         await Promise.all(
-          MODES.map(async (mode) => [
-            mode,
-            await EvalRun.findOne({ kind: 'retrieval', 'config.mode': mode }).sort({ createdAt: -1 }).lean()
-          ])
+          MODES.map(async (mode) => {
+            const rows = await db
+              .select()
+              .from(evalRuns)
+              .where(eq(evalRuns.kind, 'retrieval'))
+              .orderBy(desc(evalRuns.createdAt));
+            const match = rows.find((r) => r.config?.mode === mode);
+            return [mode, match || null];
+          })
         )
       )
     : {};
@@ -140,7 +155,7 @@ async function main() {
     }
 
     if (SAVE) {
-      await EvalRun.create({
+      await db.insert(evalRuns).values({
         kind: 'retrieval',
         config: { mode, k: K, threshold: THRESHOLD, embeddingProvider: EMBEDDING_PROVIDER, embeddingModel: EMBEDDING_MODEL, goldenSize: golden.queries.length },
         metrics: { ...results[mode].all, byKind: results[mode].byKind },

@@ -16,8 +16,10 @@ require('dotenv').config();
 
 const path = require('path');
 const { z } = require('zod');
-const connectDB = require('../config/db');
-const EvalRun = require('../models/EvalRun');
+const { desc, eq } = require('drizzle-orm');
+const { connectPG } = require('../db/pool');
+const { getDb } = require('../db');
+const { evalRuns } = require('../db/schema');
 const { generateLessonPlan } = require('../services/ragService');
 const { chatWithRetry, CHAT_MODEL, CHAT_PROVIDER } = require('../services/llmClient');
 
@@ -129,7 +131,8 @@ const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0)
 const f2 = (x) => x.toFixed(2);
 
 async function main() {
-  await connectDB();
+  await connectPG();
+  const db = getDb();
   const started = Date.now();
 
   const wanted = IDS || DEFAULT_IDS.slice(0, LIMIT);
@@ -194,14 +197,14 @@ async function main() {
   console.log(`   judge tokens: ${usage.judgePromptTokens + usage.judgeCompletionTokens}`);
 
   if (SAVE) {
-    const prev = await EvalRun.findOne({ kind: 'generation' }).sort({ createdAt: -1 }).lean();
+    const [prev] = await db.select().from(evalRuns).where(eq(evalRuns.kind, 'generation')).orderBy(desc(evalRuns.createdAt)).limit(1);
     if (prev) {
       const d = (k) => `${prev.metrics[k] !== undefined ? (metrics[k] - prev.metrics[k] >= 0 ? '+' : '') + f2(metrics[k] - prev.metrics[k]) : 'n/a'}`;
       console.log(
         `   vs last run (${new Date(prev.createdAt).toLocaleString('en-IN')}, ${prev.config.generator}): pass ${d('passRate')}, faithfulness ${d('faithfulness')}, gradeFit ${d('gradeFit')}, lowResource ${d('lowResource')}`
       );
     }
-    await EvalRun.create({
+    await db.insert(evalRuns).values({
       kind: 'generation',
       config: { generator: `${CHAT_PROVIDER}/${CHAT_MODEL}`, judge: JUDGE_MODEL, ids: queries.map((q) => q.id) },
       metrics,

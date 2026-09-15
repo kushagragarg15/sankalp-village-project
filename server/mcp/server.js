@@ -30,10 +30,11 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const { z } = require('zod');
-const mongoose = require('mongoose');
+const { eq } = require('drizzle-orm');
 const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
-const User = require('../models/User');
+const { getDb } = require('../db');
+const { users } = require('../db/schema');
 const { toolsForRole } = require('../services/agentTools');
 const { CHAT_PROVIDER, EMBEDDING_PROVIDER, EMBEDDING_MODEL } = require('../services/llmClient');
 
@@ -71,18 +72,18 @@ async function main() {
     console.error('MCP_USER_EMAIL is not set. The server runs as one Sankalp user and exposes that user\'s tools; refusing to start unscoped.');
     process.exit(1);
   }
-  if (!process.env.MONGO_URI) {
-    console.error('MONGO_URI is not set (looked in server/.env).');
+  if (!process.env.DATABASE_URL) {
+    console.error('DATABASE_URL is not set (looked in server/.env).');
     process.exit(1);
   }
 
-  await mongoose.connect(process.env.MONGO_URI);
-  const doc = await User.findOne({ email }).select('name email role').lean();
+  const db = getDb();
+  const [doc] = await db.select({ id: users.id, name: users.name, email: users.email, role: users.role }).from(users).where(eq(users.email, email)).limit(1);
   if (!doc) {
     console.error(`No Sankalp user with email ${email}.`);
     process.exit(1);
   }
-  const user = { ...doc, id: String(doc._id) };
+  const user = { ...doc, _id: doc.id };
   const ctx = { user };
 
   const server = new McpServer({ name: 'sankalp', version: '1.0.0' });

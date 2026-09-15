@@ -1,8 +1,5 @@
-const Student = require('../models/Student');
-const User = require('../models/User');
-const TeachingLog = require('../models/TeachingLog');
-const AttendanceSession = require('../models/AttendanceSession');
-const Registration = require('../models/Registration');
+const { sql } = require('drizzle-orm');
+const { getDb } = require('../db');
 const { retrieveContext, generateLessonPlan } = require('./ragService');
 
 /**
@@ -24,15 +21,13 @@ const { retrieveContext, generateLessonPlan } = require('./ragService');
  *
  * Everything returned here is *data* the model reads, not instructions — a
  * student named "ignore previous instructions" must stay a student name. The
- * system prompt in agentService.js says so explicitly, and tool results are
- * wrapped in a clearly labelled block before they are handed back.
+ * in-app agent's system prompt (now ai-service/app/agent/prompt.py) says so
+ * explicitly, and tool results are wrapped in a clearly labelled block
+ * before they are handed back — same discipline the MCP server and
+ * sessionPrepService.js expect from these tools.
  */
 
 const ROLES = { ALL: ['admin', 'volunteer'], ADMIN: ['admin'] };
-
-// User-typed names go into regexes; a stray "(" must not turn into a syntax error.
-const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const nameRegex = (name) => new RegExp(escapeRegex(name.trim()), 'i');
 
 // Teaching logs say "Maths", the resource library says "Math"; the model may use either.
 const normaliseSubject = (s) => String(s || '').trim().replace(/^maths$/i, 'Math');
@@ -42,6 +37,12 @@ const daysAgo = (n) => {
   d.setHours(0, 0, 0, 0);
   d.setDate(d.getDate() - n);
   return d;
+};
+
+const quizAverage = (scores) => {
+  const valid = (scores || []).filter((q) => Number(q.maxScore) > 0);
+  if (valid.length === 0) return null;
+  return Math.round((valid.reduce((sum, q) => sum + Number(q.score) / Number(q.maxScore), 0) / valid.length) * 100);
 };
 
 const tools = [
@@ -66,7 +67,6 @@ const tools = [
     },
     roles: ROLES.ALL,
     async run({ topic, subject, grade }) {
-      // Threshold left to the embedding model's default (see llmClient).
       const chunks = await retrieveContext({ topic, subject: normaliseSubject(subject), grade, k: 4 });
       return {
         matches: chunks.length,
@@ -127,10 +127,13 @@ const tools = [
     },
     roles: ROLES.ALL,
     async run({ name }) {
-      const candidates = await Student.find({ name: nameRegex(name) })
-        .select('name grade enrollmentDate quizScores')
-        .limit(5)
-        .lean();
+      const db = getDb();
+      const candidates = (
+        await db.execute(sql`
+          SELECT id, name, grade, enrollment_date
+          FROM students WHERE name ILIKE ${'%' + name + '%'} LIMIT 5
+        `)
+      ).rows;
 
       if (candidates.length === 0) return { found: false, message: `No student matching "${name}".` };
       if (candidates.length > 1) {
@@ -143,38 +146,43 @@ const tools = [
       }
 
       const student = candidates[0];
-      const logs = await TeachingLog.find({ studentId: student._id })
-        .populate('volunteerId', 'name')
-        .sort({ timestamp: -1 })
-        .limit(40)
-        .select('subject topic timestamp sessionId volunteerId')
-        .lean();
+      const [logs, scores] = await Promise.all([
+        db.execute(sql`
+          SELECT tl.subject, tl.topic, tl.logged_at, tl.session_id, u.name AS volunteer_name
+          FROM teaching_logs tl
+          LEFT JOIN users u ON u.id = tl.volunteer_id
+          WHERE tl.student_id = ${student.id}
+          ORDER BY tl.logged_at DESC
+          LIMIT 40
+        `).then((r) => r.rows),
+        db.execute(sql`
+          SELECT subject, topic, score, max_score, taken_at
+          FROM quiz_scores WHERE student_id = ${student.id}
+          ORDER BY taken_at DESC LIMIT 10
+        `).then((r) => r.rows)
+      ]);
 
-      const sessionsAttended = new Set(logs.map((l) => String(l.sessionId))).size;
-      const lastTaught = logs[0]?.timestamp || null;
+      const sessionsAttended = new Set(logs.map((l) => String(l.session_id))).size;
+      const lastTaught = logs[0]?.logged_at || null;
 
       return {
         found: true,
-        student: { name: student.name, grade: student.grade, enrolledOn: student.enrollmentDate },
+        student: { name: student.name, grade: student.grade, enrolledOn: student.enrollment_date },
         sessionsAttended,
         lastTaught,
-        daysSinceLastTaught: lastTaught
-          ? Math.floor((Date.now() - new Date(lastTaught)) / 86400000)
-          : null,
+        daysSinceLastTaught: lastTaught ? Math.floor((Date.now() - new Date(lastTaught)) / 86400000) : null,
         recentLessons: logs.slice(0, 12).map((l) => ({
-          date: l.timestamp,
+          date: l.logged_at,
           subject: l.subject,
           topic: l.topic,
-          volunteer: l.volunteerId?.name || null
+          volunteer: l.volunteer_name || null
         })),
-        quizScores: (student.quizScores || [])
-          .slice(-10)
-          .map((q) => ({
-            subject: q.subject,
-            topic: q.topic,
-            percent: q.maxScore ? Math.round((q.score / q.maxScore) * 100) : null,
-            date: q.date
-          }))
+        quizScores: scores.map((q) => ({
+          subject: q.subject,
+          topic: q.topic,
+          percent: Number(q.max_score) ? Math.round((Number(q.score) / Number(q.max_score)) * 100) : null,
+          date: q.taken_at
+        }))
       };
     }
   },
@@ -202,36 +210,59 @@ const tools = [
     },
     roles: ROLES.ALL,
     async run({ grade, subject, notTaughtForDays = 21, lowScoreBelowPercent = 50 }) {
-      const filter = grade ? { grade: nameRegex(grade) } : {};
-      const students = await Student.find(filter).select('name grade quizScores').lean();
+      const db = getDb();
+      const students = (
+        grade
+          ? await db.execute(sql`SELECT id, name, grade FROM students WHERE grade ILIKE ${'%' + grade + '%'}`)
+          : await db.execute(sql`SELECT id, name, grade FROM students`)
+      ).rows;
       if (students.length === 0) return { students: [], message: 'No students match.' };
 
-      // One round trip for everyone's last lesson, rather than one per student.
-      const lastLessons = await TeachingLog.aggregate([
-        { $match: { studentId: { $in: students.map((s) => s._id) } } },
-        { $group: { _id: '$studentId', lastTaught: { $max: '$timestamp' } } }
-      ]);
-      const lastTaughtById = new Map(lastLessons.map((r) => [String(r._id), r.lastTaught]));
+      const ids = students.map((s) => s.id);
+      // One round trip for everyone's last lesson.
+      const lastLessons = (
+        await db.execute(sql`
+          SELECT student_id, MAX(logged_at) AS last_taught
+          FROM teaching_logs WHERE student_id IN ${sql`(${sql.join(ids.map((i) => sql`${i}::uuid`), sql`, `)})`}
+          GROUP BY student_id
+        `)
+      ).rows;
+      const lastTaughtById = new Map(lastLessons.map((r) => [String(r.student_id), r.last_taught]));
+
+      // All quiz scores for the candidate set, filtered by subject in JS
+      // (matches the original average-since-the-selected-subject logic).
+      const allScores = (
+        await db.execute(sql`
+          SELECT student_id, subject, score, max_score
+          FROM quiz_scores WHERE student_id IN ${sql`(${sql.join(ids.map((i) => sql`${i}::uuid`), sql`, `)})`}
+        `)
+      ).rows;
+      const scoresByStudent = new Map();
+      for (const row of allScores) {
+        const key = String(row.student_id);
+        if (!scoresByStudent.has(key)) scoresByStudent.set(key, []);
+        scoresByStudent.get(key).push(row);
+      }
 
       const cutoff = daysAgo(notTaughtForDays);
-      const subjectRe = subject ? nameRegex(subject) : null;
+      const subjectRe = subject ? new RegExp(subject, 'i') : null;
 
       const flagged = [];
       for (const s of students) {
         const reasons = [];
-        const lastTaught = lastTaughtById.get(String(s._id)) || null;
+        const lastTaught = lastTaughtById.get(String(s.id)) || null;
 
         if (!lastTaught) reasons.push('never taught');
-        else if (lastTaught < cutoff) {
-          reasons.push(`not taught for ${Math.floor((Date.now() - lastTaught) / 86400000)} days`);
+        else if (new Date(lastTaught) < cutoff) {
+          reasons.push(`not taught for ${Math.floor((Date.now() - new Date(lastTaught)) / 86400000)} days`);
         }
 
-        const scores = (s.quizScores || []).filter(
-          (q) => q.maxScore && (!subjectRe || subjectRe.test(q.subject))
+        const scores = (scoresByStudent.get(String(s.id)) || []).filter(
+          (q) => Number(q.max_score) && (!subjectRe || subjectRe.test(q.subject))
         );
         if (scores.length > 0) {
           const avg = Math.round(
-            (scores.reduce((sum, q) => sum + q.score / q.maxScore, 0) / scores.length) * 100
+            (scores.reduce((sum, q) => sum + Number(q.score) / Number(q.max_score), 0) / scores.length) * 100
           );
           if (avg < lowScoreBelowPercent) {
             reasons.push(`quiz average ${avg}%${subject ? ` in ${subject}` : ''}`);
@@ -241,7 +272,7 @@ const tools = [
         if (reasons.length) flagged.push({ name: s.name, grade: s.grade, lastTaught, reasons });
       }
 
-      flagged.sort((a, b) => (a.lastTaught || 0) - (b.lastTaught || 0));
+      flagged.sort((a, b) => (a.lastTaught ? new Date(a.lastTaught).getTime() : 0) - (b.lastTaught ? new Date(b.lastTaught).getTime() : 0));
       return {
         checked: students.length,
         flagged: flagged.length,
@@ -270,55 +301,55 @@ const tools = [
     },
     roles: ROLES.ALL,
     async run({ range, limit = 5 }) {
-      const now = new Date();
+      const db = getDb();
       const n = Math.min(Math.max(limit, 1), 20);
-      const query =
-        range === 'live'
-          ? { startTime: { $lte: now }, endTime: { $gte: now } }
-          : range === 'upcoming'
-            ? { startTime: { $gt: now } }
-            : { endTime: { $lt: now } };
 
-      const sessions = await AttendanceSession.find(query)
-        .sort({ startTime: range === 'past' ? -1 : 1 })
-        .limit(n)
-        .select('title startTime endTime')
-        .lean();
+      const whereClause =
+        range === 'live'
+          ? sql`start_time <= now() AND end_time >= now()`
+          : range === 'upcoming'
+            ? sql`start_time > now()`
+            : sql`end_time < now()`;
+      const orderClause = range === 'past' ? sql`start_time DESC` : sql`start_time ASC`;
+
+      const sessions = (
+        await db.execute(sql`
+          SELECT id, title, start_time, end_time FROM attendance_sessions
+          WHERE ${whereClause} ORDER BY ${orderClause} LIMIT ${n}
+        `)
+      ).rows;
       if (sessions.length === 0) return { sessions: [] };
 
-      const ids = sessions.map((s) => s._id);
+      const ids = sessions.map((s) => s.id);
+      const idList = sql`(${sql.join(ids.map((i) => sql`${i}::uuid`), sql`, `)})`;
       const [regs, logs] = await Promise.all([
-        Registration.aggregate([
-          { $match: { sessionId: { $in: ids } } },
-          { $group: { _id: '$sessionId', count: { $sum: 1 } } }
-        ]),
-        TeachingLog.aggregate([
-          { $match: { sessionId: { $in: ids } } },
-          {
-            $group: {
-              _id: '$sessionId',
-              lessons: { $sum: 1 },
-              students: { $addToSet: '$studentId' },
-              volunteers: { $addToSet: '$volunteerId' }
-            }
-          }
-        ])
+        db
+          .execute(sql`SELECT session_id, COUNT(*)::int AS count FROM registrations WHERE session_id IN ${idList} GROUP BY session_id`)
+          .then((r) => r.rows),
+        db
+          .execute(sql`
+            SELECT session_id, COUNT(*)::int AS lessons,
+                   COUNT(DISTINCT student_id)::int AS students,
+                   COUNT(DISTINCT volunteer_id)::int AS volunteers
+            FROM teaching_logs WHERE session_id IN ${idList} GROUP BY session_id
+          `)
+          .then((r) => r.rows)
       ]);
-      const regById = new Map(regs.map((r) => [String(r._id), r.count]));
-      const logById = new Map(logs.map((r) => [String(r._id), r]));
+      const regById = new Map(regs.map((r) => [String(r.session_id), r.count]));
+      const logById = new Map(logs.map((r) => [String(r.session_id), r]));
 
       return {
-        now,
+        now: new Date(),
         sessions: sessions.map((s) => {
-          const l = logById.get(String(s._id));
+          const l = logById.get(String(s.id));
           return {
             title: s.title,
-            startTime: s.startTime,
-            endTime: s.endTime,
-            volunteersRegistered: regById.get(String(s._id)) || 0,
+            startTime: s.start_time,
+            endTime: s.end_time,
+            volunteersRegistered: regById.get(String(s.id)) || 0,
             lessonsLogged: l?.lessons || 0,
-            studentsTaught: l?.students.length || 0,
-            volunteersWhoTaught: l?.volunteers.length || 0
+            studentsTaught: l?.students || 0,
+            volunteersWhoTaught: l?.volunteers || 0
           };
         })
       };
@@ -343,89 +374,95 @@ const tools = [
     },
     roles: ROLES.ALL,
     async run({ limit = 15 }, ctx) {
+      const db = getDb();
       const n = Math.min(Math.max(limit, 1), 40);
-      const [recent, totals, perStudent] = await Promise.all([
-        TeachingLog.find({ volunteerId: ctx.user._id })
-          .populate('studentId', 'name grade')
-          .populate('sessionId', 'title startTime')
-          .sort({ timestamp: -1 })
-          .limit(n)
-          .select('subject topic timestamp studentId sessionId')
-          .lean(),
-        TeachingLog.aggregate([
-          { $match: { volunteerId: ctx.user._id } },
-          {
-            $group: {
-              _id: null,
-              lessons: { $sum: 1 },
-              students: { $addToSet: '$studentId' },
-              sessions: { $addToSet: '$sessionId' },
-              subjects: { $addToSet: '$subject' }
-            }
-          }
-        ]),
-        // One row per child this volunteer has taught, with what and when.
-        TeachingLog.aggregate([
-          { $match: { volunteerId: ctx.user._id } },
-          { $sort: { timestamp: -1 } },
-          {
-            $group: {
-              _id: '$studentId',
-              lessons: { $sum: 1 },
-              lastTaughtByMe: { $first: '$timestamp' },
-              topics: { $push: { $concat: ['$subject', ': ', '$topic'] } }
-            }
-          },
-          { $sort: { lastTaughtByMe: -1 } },
-          { $limit: 30 },
-          { $lookup: { from: 'students', localField: '_id', foreignField: '_id', as: 'student' } },
-          { $unwind: '$student' },
-          {
-            $project: {
-              name: '$student.name',
-              grade: '$student.grade',
-              lessons: 1,
-              lastTaughtByMe: 1,
-              topics: { $slice: ['$topics', 4] },
-              quizScores: '$student.quizScores'
-            }
-          }
-        ])
-      ]);
-      const t = totals[0];
+      const volunteerId = ctx.user.id;
 
-      const quizAverage = (scores) => {
-        const valid = (scores || []).filter((q) => q.maxScore);
-        if (valid.length === 0) return null;
-        return Math.round((valid.reduce((sum, q) => sum + q.score / q.maxScore, 0) / valid.length) * 100);
-      };
+      const [recent, totalsRows, perStudentRows] = await Promise.all([
+        db.execute(sql`
+          SELECT tl.subject, tl.topic, tl.logged_at,
+                 s.id AS student_id, s.name AS student_name, s.grade AS student_grade,
+                 se.id AS session_id, se.title AS session_title
+          FROM teaching_logs tl
+          LEFT JOIN students s ON s.id = tl.student_id
+          LEFT JOIN attendance_sessions se ON se.id = tl.session_id
+          WHERE tl.volunteer_id = ${volunteerId}
+          ORDER BY tl.logged_at DESC
+          LIMIT ${n}
+        `).then((r) => r.rows),
+        db.execute(sql`
+          SELECT COUNT(*)::int AS lessons,
+                 COUNT(DISTINCT student_id)::int AS students,
+                 COUNT(DISTINCT session_id)::int AS sessions,
+                 ARRAY_AGG(DISTINCT subject) AS subjects
+          FROM teaching_logs WHERE volunteer_id = ${volunteerId}
+        `).then((r) => r.rows),
+        // One row per child this volunteer has taught, most recent first.
+        db.execute(sql`
+          SELECT student_id, COUNT(*)::int AS lessons, MAX(logged_at) AS last_taught_by_me,
+                 ARRAY_AGG(subject || ': ' || topic ORDER BY logged_at DESC) AS topics
+          FROM teaching_logs WHERE volunteer_id = ${volunteerId}
+          GROUP BY student_id
+          ORDER BY MAX(logged_at) DESC
+          LIMIT 30
+        `).then((r) => r.rows)
+      ]);
+
+      const t = totalsRows[0];
+      const studentIds = perStudentRows.map((r) => r.student_id);
+      const [studentRows, scoreRows] =
+        studentIds.length > 0
+          ? await Promise.all([
+              db
+                .execute(sql`SELECT id, name, grade FROM students WHERE id IN ${sql`(${sql.join(studentIds.map((i) => sql`${i}::uuid`), sql`, `)})`}`)
+                .then((r) => r.rows),
+              db
+                .execute(
+                  sql`SELECT student_id, subject, score, max_score FROM quiz_scores WHERE student_id IN ${sql`(${sql.join(studentIds.map((i) => sql`${i}::uuid`), sql`, `)})`}`
+                )
+                .then((r) => r.rows)
+            ])
+          : [[], []];
+      const studentById = new Map(studentRows.map((s) => [String(s.id), s]));
+      const scoresByStudent = new Map();
+      for (const row of scoreRows) {
+        const key = String(row.student_id);
+        if (!scoresByStudent.has(key)) scoresByStudent.set(key, []);
+        scoresByStudent.get(key).push(row);
+      }
+
       return {
         volunteer: ctx.user.name,
-        totals: t
+        totals: t && t.lessons > 0
           ? {
               lessons: t.lessons,
-              distinctStudents: t.students.length,
-              sessionsTaught: t.sessions.length,
-              subjects: t.subjects
+              distinctStudents: t.students,
+              sessionsTaught: t.sessions,
+              subjects: (t.subjects || []).filter(Boolean)
             }
           : { lessons: 0, distinctStudents: 0, sessionsTaught: 0, subjects: [] },
         recentLessons: recent.map((l) => ({
-          date: l.timestamp,
-          session: l.sessionId?.title || null,
-          student: l.studentId?.name || null,
-          grade: l.studentId?.grade || null,
+          date: l.logged_at,
+          session: l.session_title || null,
+          student: l.student_name || null,
+          grade: l.student_grade || null,
           subject: l.subject,
           topic: l.topic
         })),
-        myStudents: perStudent.map((r) => ({
-          name: r.name,
-          grade: r.grade,
-          lessonsWithMe: r.lessons,
-          lastTaughtByMe: r.lastTaughtByMe,
-          daysSince: Math.floor((Date.now() - new Date(r.lastTaughtByMe)) / 86400000),
-          recentTopicsWithMe: r.topics,
-          quizAveragePercent: quizAverage(r.quizScores)
-        }))
+        myStudents: perStudentRows.map((r) => {
+          const student = studentById.get(String(r.student_id));
+          return {
+            name: student?.name || null,
+            grade: student?.grade || null,
+            lessonsWithMe: r.lessons,
+            lastTaughtByMe: r.last_taught_by_me,
+            daysSince: Math.floor((Date.now() - new Date(r.last_taught_by_me)) / 86400000),
+            recentTopicsWithMe: (r.topics || []).slice(0, 4),
+            quizAveragePercent: quizAverage(
+              (scoresByStudent.get(String(r.student_id)) || []).map((q) => ({ score: q.score, maxScore: q.max_score }))
+            )
+          };
+        })
       };
     }
   },
@@ -449,36 +486,39 @@ const tools = [
     },
     roles: ROLES.ADMIN,
     async run({ name, days = 30, limit = 10 }) {
+      const db = getDb();
       const since = daysAgo(days);
-      const volunteerFilter = { role: 'volunteer' };
-      if (name) volunteerFilter.name = nameRegex(name);
 
-      const volunteers = await User.find(volunteerFilter).select('name createdAt').lean();
+      const volunteers = (
+        name
+          ? await db.execute(sql`SELECT id, name FROM users WHERE role = 'volunteer' AND name ILIKE ${'%' + name + '%'}`)
+          : await db.execute(sql`SELECT id, name FROM users WHERE role = 'volunteer'`)
+      ).rows;
       if (volunteers.length === 0) return { volunteers: [], message: 'No volunteers match.' };
 
-      const stats = await TeachingLog.aggregate([
-        { $match: { volunteerId: { $in: volunteers.map((v) => v._id) }, timestamp: { $gte: since } } },
-        {
-          $group: {
-            _id: '$volunteerId',
-            lessons: { $sum: 1 },
-            students: { $addToSet: '$studentId' },
-            sessions: { $addToSet: '$sessionId' },
-            lastTaught: { $max: '$timestamp' }
-          }
-        }
-      ]);
-      const byId = new Map(stats.map((s) => [String(s._id), s]));
+      const ids = volunteers.map((v) => v.id);
+      const stats = (
+        await db.execute(sql`
+          SELECT volunteer_id, COUNT(*)::int AS lessons,
+                 COUNT(DISTINCT student_id)::int AS students,
+                 COUNT(DISTINCT session_id)::int AS sessions,
+                 MAX(logged_at) AS last_taught
+          FROM teaching_logs
+          WHERE volunteer_id IN ${sql`(${sql.join(ids.map((i) => sql`${i}::uuid`), sql`, `)})`} AND logged_at >= ${since}
+          GROUP BY volunteer_id
+        `)
+      ).rows;
+      const byId = new Map(stats.map((s) => [String(s.volunteer_id), s]));
 
       const rows = volunteers
         .map((v) => {
-          const s = byId.get(String(v._id));
+          const s = byId.get(String(v.id));
           return {
             name: v.name,
             lessons: s?.lessons || 0,
-            distinctStudents: s?.students.length || 0,
-            sessionsTaught: s?.sessions.length || 0,
-            lastTaught: s?.lastTaught || null
+            distinctStudents: s?.students || 0,
+            sessionsTaught: s?.sessions || 0,
+            lastTaught: s?.last_taught || null
           };
         })
         .sort((a, b) => b.lessons - a.lessons);

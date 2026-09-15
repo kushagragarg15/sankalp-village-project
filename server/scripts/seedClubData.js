@@ -12,14 +12,14 @@
  */
 
 require('dotenv').config();
-const mongoose = require('mongoose');
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
+const { eq, isNull, isNotNull } = require('drizzle-orm');
 
-const User = require('../models/User');
-const Student = require('../models/Student');
-const AttendanceSession = require('../models/AttendanceSession');
-const Registration = require('../models/Registration');
-const TeachingLog = require('../models/TeachingLog');
+const { connectPG } = require('../db/pool');
+const { getDb } = require('../db');
+const { users, students, attendanceSessions, registrations, teachingLogs, quizScores } = require('../db/schema');
+const { parseGradeNumber } = require('../utils/grade');
 
 // The term being reconstructed. Nothing is written after TODAY.
 const TERM_START = new Date('2026-08-01T00:00:00+05:30');
@@ -185,55 +185,61 @@ const nearSchool = () => ({
 });
 
 async function seed() {
-  await mongoose.connect(process.env.MONGO_URI);
-  console.log('Connected to MongoDB\n');
+  await connectPG();
+  const db = getDb();
+  console.log('Connected to PostgreSQL\n');
 
   // --- clear, preserving real sign-ins -------------------------------------
-  const realMembers = await User.find({ googleId: { $ne: null } }).select('name email role').lean();
-  const removedUsers = await User.deleteMany({ googleId: null });
+  const realMembers = await db.select({ name: users.name, email: users.email, role: users.role }).from(users).where(isNotNull(users.googleId));
 
-  await Promise.all([
-    Student.deleteMany({}),
-    AttendanceSession.deleteMany({}),
-    Registration.deleteMany({}),
-    TeachingLog.deleteMany({}),
-  ]);
+  // Children before the parents they reference; non-Google users deleted last.
+  await db.delete(teachingLogs);
+  await db.delete(registrations);
+  await db.delete(attendanceSessions);
+  await db.delete(students); // quiz_scores cascade with their student
+  const removedUsers = await db.delete(users).where(isNull(users.googleId)).returning({ id: users.id });
 
-  console.log(`Cleared demo data. Removed ${removedUsers.deletedCount} seeded accounts.`);
+  console.log(`Cleared demo data. Removed ${removedUsers.length} seeded accounts.`);
   console.log(`Preserved ${realMembers.length} real members who sign in with Google:`);
   realMembers.forEach((m) => console.log(`   ${m.role.padEnd(10)} ${m.email}`));
   console.log('');
 
   // --- volunteers -----------------------------------------------------------
   const hashed = await bcrypt.hash(DEMO_PASSWORD, 10);
-  const volunteerDocs = await User.insertMany(
-    VOLUNTEERS.map(([name, roll]) => ({
-      name,
-      email: `${roll}@lnmiit.ac.in`,
-      password: hashed,
-      role: 'volunteer',
-      phone: `9${between(1, 9)}${String(between(10000000, 99999999))}`,
-    }))
-  );
+  const volunteerDocs = await db
+    .insert(users)
+    .values(
+      VOLUNTEERS.map(([name, roll]) => ({
+        name,
+        email: `${roll}@lnmiit.ac.in`,
+        passwordHash: hashed,
+        role: 'volunteer',
+        phone: `9${between(1, 9)}${String(between(10000000, 99999999))}`,
+      }))
+    )
+    .returning();
 
   // Real members teach too, so the register is not made only of seeded people.
-  const realTeaching = await User.find({ googleId: { $ne: null } }).select('_id').lean();
+  const realTeaching = await db.select({ id: users.id }).from(users).where(isNotNull(users.googleId));
   const teachers = [...volunteerDocs, ...realTeaching];
-  const admin =
-    (await User.findOne({ role: 'admin' }).select('_id').lean()) || volunteerDocs[0];
+  const [adminRow] = await db.select({ id: users.id }).from(users).where(eq(users.role, 'admin')).limit(1);
+  const admin = adminRow || volunteerDocs[0];
 
   console.log(`Created ${volunteerDocs.length} volunteer accounts.`);
 
   // --- students -------------------------------------------------------------
   // Most enrolled as the club started; a few joined as word spread.
-  const studentDocs = await Student.insertMany(
-    STUDENTS.map(([name, grade], i) => {
-      const joinedLate = i >= STUDENTS.length - 7;
-      const enrolled = new Date(TERM_START);
-      enrolled.setDate(enrolled.getDate() - (joinedLate ? -between(14, 33) : between(2, 9)));
-      return { name, grade, parentPhone: phone(), enrollmentDate: enrolled };
-    })
-  );
+  const studentDocs = await db
+    .insert(students)
+    .values(
+      STUDENTS.map(([name, grade], i) => {
+        const joinedLate = i >= STUDENTS.length - 7;
+        const enrolled = new Date(TERM_START);
+        enrolled.setDate(enrolled.getDate() - (joinedLate ? -between(14, 33) : between(2, 9)));
+        return { name, grade, gradeNumber: parseGradeNumber(grade), parentPhone: phone(), enrollmentDate: enrolled };
+      })
+    )
+    .returning();
   console.log(`Enrolled ${studentDocs.length} students.`);
 
   // --- the term -------------------------------------------------------------
@@ -242,21 +248,21 @@ async function seed() {
   // Volunteer commitment varies: a core group turns up nearly every weekend,
   // others fade, a few only join later in the term.
   const commitment = teachers.map((t, i) => ({
-    id: t._id,
+    id: t.id,
     reliability: i < 5 ? 0.85 + rand() * 0.12 : i < 10 ? 0.45 + rand() * 0.3 : 0.15 + rand() * 0.3,
     joinsAt: i >= teachers.length - 3 ? between(4, 7) : 0,
   }));
 
   // Likewise for children: some never miss, some drift in and out.
   const regularity = studentDocs.map((s, i) => ({
-    id: s._id,
+    id: s.id,
     grade: s.grade,
     rate: i % 7 === 0 ? 0.35 + rand() * 0.2 : 0.6 + rand() * 0.35,
   }));
 
-  const sessions = [];
-  const registrations = [];
-  const logs = [];
+  const sessionRows = [];
+  const registrationRows = [];
+  const logRows = [];
 
   // A child works through a subject rather than being taught the same topic
   // over and over, so each (student, subject) walks its syllabus in order and
@@ -280,19 +286,21 @@ async function seed() {
     const end = new Date(start);
     end.setHours(start.getHours() + SESSION_HOURS);
 
+    const sessionId = crypto.randomUUID();
     const session = {
-      _id: new mongoose.Types.ObjectId(),
+      id: sessionId,
       title: titleFor(start),
       startTime: start,
       endTime: end,
-      location: { ...SCHOOL },
+      lat: SCHOOL.lat,
+      lng: SCHOOL.lng,
       activeCode: null,
       codeExpiry: null,
-      createdBy: admin._id,
+      createdBy: admin.id,
       createdAt: new Date(start.getTime() - between(2, 5) * 3600 * 1000),
       updatedAt: end,
     };
-    sessions.push(session);
+    sessionRows.push(session);
 
     // Who showed up. Turnout builds a little over the first few weekends.
     const momentum = Math.min(1, 0.62 + index * 0.05);
@@ -304,9 +312,9 @@ async function seed() {
     const attending = present.length >= 3 ? present : shuffled(commitment).slice(0, between(3, 5));
 
     attending.forEach((v) => {
-      registrations.push({
+      registrationRows.push({
         userId: v.id,
-        sessionId: session._id,
+        sessionId,
         createdAt: new Date(start.getTime() - between(1, 96) * 3600 * 1000),
         updatedAt: start,
       });
@@ -318,7 +326,7 @@ async function seed() {
     let cursor = 0;
 
     // (volunteer, student) pairs already used this session — the unique index
-    // on the collection forbids repeats.
+    // on the table forbids repeats.
     const taken = new Set();
 
     const record = (volunteerId, child, avoidSubject) => {
@@ -334,13 +342,13 @@ async function seed() {
       const at = new Date(start.getTime() + between(18, 160) * 60 * 1000);
       const where = nearSchool();
 
-      logs.push({
+      logRows.push({
         volunteerId,
-        sessionId: session._id,
+        sessionId,
         studentId: child.id,
         subject,
         topic,
-        timestamp: at,
+        loggedAt: at,
         codeUsed: code(),
         lat: where.lat,
         lng: where.lng,
@@ -372,13 +380,13 @@ async function seed() {
     });
   });
 
-  await AttendanceSession.insertMany(sessions);
-  await Registration.insertMany(registrations);
-  await TeachingLog.insertMany(logs);
+  if (sessionRows.length > 0) await db.insert(attendanceSessions).values(sessionRows);
+  if (registrationRows.length > 0) await db.insert(registrations).values(registrationRows);
+  if (logRows.length > 0) await db.insert(teachingLogs).values(logRows);
 
-  console.log(`\nWrote ${sessions.length} weekend sessions:`);
-  sessions.forEach((s) => {
-    const taught = logs.filter((l) => String(l.sessionId) === String(s._id));
+  console.log(`\nWrote ${sessionRows.length} weekend sessions:`);
+  sessionRows.forEach((s) => {
+    const taught = logRows.filter((l) => String(l.sessionId) === String(s.id));
     const volunteers = new Set(taught.map((l) => String(l.volunteerId))).size;
     const children = new Set(taught.map((l) => String(l.studentId))).size;
     console.log(
@@ -390,12 +398,13 @@ async function seed() {
   // --- quiz scores ----------------------------------------------------------
   // Coordinators test a topic every few weeks, not after every lesson.
   let quizzed = 0;
+  const quizRows = [];
   for (const student of studentDocs) {
     if (!chance(0.55)) continue;
 
     const taughtSubjects = [
       ...new Set(
-        logs.filter((l) => String(l.studentId) === String(student._id)).map((l) => l.subject)
+        logRows.filter((l) => String(l.studentId) === String(student.id)).map((l) => l.subject)
       ),
     ];
     if (taughtSubjects.length === 0) continue;
@@ -421,17 +430,20 @@ async function seed() {
 
     if (scores.length > 0) {
       scores.sort((a, b) => a.date - b.date);
-      await Student.updateOne({ _id: student._id }, { $set: { quizScores: scores } });
+      scores.forEach((q) =>
+        quizRows.push({ studentId: student.id, subject: q.subject, topic: q.topic, score: String(q.score), maxScore: String(q.maxScore), takenAt: q.date })
+      );
       quizzed += 1;
     }
   }
+  if (quizRows.length > 0) await db.insert(quizScores).values(quizRows);
 
   console.log(`\nRecorded quiz scores for ${quizzed} students.`);
-  console.log(`Total: ${logs.length} lessons across ${sessions.length} sessions.`);
+  console.log(`Total: ${logRows.length} lessons across ${sessionRows.length} sessions.`);
   console.log(`\nSeeded volunteers sign in with: ${DEMO_PASSWORD}`);
   console.log('Real members keep using Google sign-in.');
 
-  await mongoose.disconnect();
+  process.exit(0);
 }
 
 seed().catch((error) => {

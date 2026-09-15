@@ -206,9 +206,6 @@ async function chatStreamWithRetry(params) {
   }
 }
 
-/** SDK client for embeddings (ingest and retrieval). May be a different provider. */
-const getEmbeddingClient = () => clientFor(EMBEDDING_PROVIDER);
-
 module.exports = {
   PROVIDER: CHAT_PROVIDER,
   CHAT_PROVIDER,
@@ -219,7 +216,6 @@ module.exports = {
   isConfigured,
   notConfiguredMessage,
   getClient,
-  getEmbeddingClient,
   chatWithRetry,
   chatStreamWithRetry
 };

@@ -3,12 +3,17 @@ const dotenv = require('dotenv');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
 const connectDB = require('./config/db');
+const { connectPG } = require('./db/pool');
 const errorHandler = require('./middleware/errorHandler');
 
 // Load env vars
 dotenv.config();
 
-// Connect to database
+// PostgreSQL is the primary database — every route below reads and writes it.
+connectPG();
+// MongoDB is kept connected (not removed) until the PostgreSQL migration is
+// verified in production; nothing in the app queries it anymore except the
+// one-off scripts/migrateToPg.js.
 connectDB();
 
 const app = express();

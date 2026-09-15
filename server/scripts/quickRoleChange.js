@@ -1,6 +1,8 @@
 require('dotenv').config();
-const mongoose = require('mongoose');
-const User = require('../models/User');
+const { eq } = require('drizzle-orm');
+const { connectPG } = require('../db/pool');
+const { getDb } = require('../db');
+const { users } = require('../db/schema');
 
 // Usage: node quickRoleChange.js <email> <role>
 // Example: node quickRoleChange.js test@example.com volunteer
@@ -23,10 +25,11 @@ const quickRoleChange = async () => {
       process.exit(1);
     }
 
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log('✅ Connected to MongoDB');
+    await connectPG();
+    console.log('✅ Connected to PostgreSQL');
+    const db = getDb();
 
-    const user = await User.findOne({ email });
+    const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
     if (!user) {
       console.log(`\n❌ User with email "${email}" not found.\n`);
@@ -34,8 +37,7 @@ const quickRoleChange = async () => {
     }
 
     const oldRole = user.role;
-    user.role = role;
-    await user.save();
+    await db.update(users).set({ role }).where(eq(users.id, user.id));
 
     console.log(`\n✅ Successfully updated ${user.name}`);
     console.log(`   Email: ${user.email}`);

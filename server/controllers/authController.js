@@ -1,6 +1,9 @@
-const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
+const { eq } = require('drizzle-orm');
+const { getDb } = require('../db');
+const { users } = require('../db/schema');
+const { comparePassword } = require('../utils/password');
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -15,20 +18,15 @@ const cookieOptions = () => ({
 // One shape for the signed-in user, so /auth/login, /auth/google and /auth/me
 // all hand the client the same thing.
 const publicUser = (user) => ({
-  _id: user._id,
-  id: String(user._id),
+  _id: user.id,
+  id: user.id,
   name: user.name,
   email: user.email,
   role: user.role,
   phone: user.phone
 });
 
-// Generate JWT token
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: '30d'
-  });
-};
+const generateToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
 
 // @desc    Login user
 // @route   POST /api/auth/login
@@ -37,46 +35,30 @@ exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
-    // Validate email & password
     if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide email and password'
-      });
+      return res.status(400).json({ success: false, message: 'Please provide email and password' });
     }
 
-    // Check for user (include password for comparison)
-    const user = await User.findOne({ email }).select('+password');
+    const db = getDb();
+    const [user] = await db.select().from(users).where(eq(users.email, String(email).toLowerCase().trim())).limit(1);
 
     if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
-    // Check if password matches
-    const isMatch = await user.comparePassword(password);
+    const isMatch = await comparePassword(password, user.passwordHash);
 
     if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
-    // Create token
-    const token = generateToken(user._id);
+    const token = generateToken(user.id);
 
-    // Set cookie with token (httpOnly for security)
-    res.cookie('token', token, {
-      ...cookieOptions(),
-      maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
-    });
+    res.cookie('token', token, { ...cookieOptions(), maxAge: 30 * 24 * 60 * 60 * 1000 });
 
     res.status(200).json({
       success: true,
-      token: token, // Also send token in response for localStorage fallback
+      token,
       data: publicUser(user)
     });
   } catch (error) {
@@ -90,11 +72,7 @@ exports.login = async (req, res, next) => {
 exports.logout = async (req, res, next) => {
   try {
     res.clearCookie('token', cookieOptions());
-
-    res.status(200).json({
-      success: true,
-      message: 'Logged out successfully'
-    });
+    res.status(200).json({ success: true, message: 'Logged out successfully' });
   } catch (error) {
     next(error);
   }
@@ -105,12 +83,8 @@ exports.logout = async (req, res, next) => {
 // @access  Private
 exports.getMe = async (req, res, next) => {
   try {
-    // `protect` already loaded the projected user, so re-querying here only
-    // bought a second round trip and the unbounded `attendance` array.
-    res.status(200).json({
-      success: true,
-      data: req.user
-    });
+    // `protect` already loaded the projected user.
+    res.status(200).json({ success: true, data: req.user });
   } catch (error) {
     next(error);
   }
@@ -124,90 +98,53 @@ exports.googleAuth = async (req, res, next) => {
     const { credential } = req.body;
 
     if (!credential) {
-      return res.status(400).json({
-        success: false,
-        message: 'No credential provided'
-      });
+      return res.status(400).json({ success: false, message: 'No credential provided' });
     }
 
     if (!process.env.GOOGLE_CLIENT_ID) {
-      return res.status(503).json({
-        success: false,
-        message: 'Google sign-in is not configured on the server.'
-      });
+      return res.status(503).json({ success: false, message: 'Google sign-in is not configured on the server.' });
     }
 
-    // Verify the credential against Google's signing keys.
-    //
-    // This was `jwt.decode(credential)`, which only base64-decodes the payload
-    // and verifies nothing — anyone could hand the server a self-made token
-    // claiming any email address and be signed in as that person.
     let payload;
     try {
-      const ticket = await googleClient.verifyIdToken({
-        idToken: credential,
-        audience: process.env.GOOGLE_CLIENT_ID
-      });
+      const ticket = await googleClient.verifyIdToken({ idToken: credential, audience: process.env.GOOGLE_CLIENT_ID });
       payload = ticket.getPayload();
     } catch (error) {
-      return res.status(401).json({
-        success: false,
-        message: 'Google sign-in could not be verified. Please try again.'
-      });
+      return res.status(401).json({ success: false, message: 'Google sign-in could not be verified. Please try again.' });
     }
 
     if (!payload?.email || !payload.email_verified) {
-      return res.status(401).json({
-        success: false,
-        message: 'That Google account does not have a verified email address.'
-      });
+      return res.status(401).json({ success: false, message: 'That Google account does not have a verified email address.' });
     }
 
     const email = payload.email.toLowerCase();
 
-    // Optionally restrict sign-in to the institute domain.
     const allowedDomain = process.env.ALLOWED_EMAIL_DOMAIN;
     if (allowedDomain && !email.endsWith(`@${allowedDomain.toLowerCase()}`)) {
-      return res.status(403).json({
-        success: false,
-        message: `Sign in with your @${allowedDomain} account.`
-      });
+      return res.status(403).json({ success: false, message: `Sign in with your @${allowedDomain} account.` });
     }
 
-    let user = await User.findOne({ email });
+    const db = getDb();
+    let [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
     if (!user) {
       // Everyone starts as a volunteer. Admin is granted deliberately by an
-      // existing admin; it is never inferred from the address, which used to
-      // make every 2023/24 batch email an administrator of the whole club.
-      user = await User.create({
-        googleId: payload.sub,
-        name: payload.name || email.split('@')[0],
-        email,
-        role: 'volunteer'
-      });
+      // existing admin; never inferred from the address.
+      [user] = await db
+        .insert(users)
+        .values({ googleId: payload.sub, name: payload.name || email.split('@')[0], email, role: 'volunteer' })
+        .returning();
     } else if (!user.googleId) {
       // Link the Google identity to the existing account, and leave the role
-      // untouched: signing in must never change someone's permissions, or a
-      // deliberate demotion is silently undone at their next login.
-      user.googleId = payload.sub;
-      await user.save();
+      // untouched: signing in must never change someone's permissions.
+      [user] = await db.update(users).set({ googleId: payload.sub }).where(eq(users.id, user.id)).returning();
     }
 
-    // Create token
-    const token = generateToken(user._id);
+    const token = generateToken(user.id);
 
-    // Set cookie with token
-    res.cookie('token', token, {
-      ...cookieOptions(),
-      maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
-    });
+    res.cookie('token', token, { ...cookieOptions(), maxAge: 30 * 24 * 60 * 60 * 1000 });
 
-    res.status(200).json({
-      success: true,
-      token: token,
-      data: publicUser(user)
-    });
+    res.status(200).json({ success: true, token, data: publicUser(user) });
   } catch (error) {
     next(error);
   }

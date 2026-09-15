@@ -1,6 +1,7 @@
 const { z } = require('zod');
-const LessonPlanDraft = require('../models/LessonPlanDraft');
-const Student = require('../models/Student');
+const { eq, and, inArray } = require('drizzle-orm');
+const { getDb } = require('../db');
+const { lessonPlanDrafts, students } = require('../db/schema');
 const { CHAT_MODEL, CHAT_PROVIDER, chatWithRetry } = require('./llmClient');
 const { retrieveContext } = require('./ragService');
 const { tools, normaliseSubject } = require('./agentTools');
@@ -14,15 +15,6 @@ const { tools, normaliseSubject } = require('./agentTools');
  * what data to gather, when to retrieve, what to save — is ordinary code.
  *
  *   gather  →  plan (LLM, JSON)  →  retrieve (RAG per group)  →  write (LLM, JSON)  →  save DRAFT
- *
- * Why a workflow: the task is the same every time, so letting a model
- * improvise the steps adds cost and variance without adding value. Fixed steps
- * are also easier to test, trace and explain to the volunteer.
- *
- * Why a draft: the output goes into a real classroom. A person approves or
- * rejects it (see prepController) before it counts. Model output is validated
- * with zod before it is trusted — a plan that names a student who is not in
- * the volunteer's data is rejected, not saved.
  *
  * The gather step reuses the agent's tools as plain functions. Same data
  * access, different orchestration.
@@ -116,8 +108,6 @@ async function gatherContext(volunteer) {
     toolByName('find_students_needing_attention').run({ notTaughtForDays: 14, lowScoreBelowPercent: 60 }, ctx)
   ]);
 
-  // Every student the planner may name, so we can map names back to ids and
-  // refuse any name the model invents.
   const known = new Map();
   for (const s of history.myStudents) known.set(s.name, { name: s.name, grade: s.grade });
   for (const s of attention.students) if (!known.has(s.name)) known.set(s.name, { name: s.name, grade: s.grade });
@@ -150,7 +140,6 @@ async function planFocus(context, session, usage) {
 
   const plan = await askForJson({ system: planSystem, user, schema: PlanSchema, usage, label: 'plan' });
 
-  // Guardrail: keep only students that exist in the gathered context.
   const groups = plan.focusGroups
     .map((g) => ({
       ...g,
@@ -203,8 +192,6 @@ async function writeBlocks(groups, usage) {
   const { blocks } = await askForJson({ system: writeSystem, user, schema: BlocksSchema, usage, label: 'write' });
   const byIndex = new Map(blocks.map((b) => [b.index, b]));
 
-  // Models sometimes double-escape line breaks inside JSON strings, so the
-  // stored text would contain a literal backslash-n. Normalise once, here.
   const unescape = (s) => (typeof s === 'string' ? s.replace(/\\n/g, '\n').trim() : s);
 
   return groups.map((g, index) => {
@@ -231,15 +218,22 @@ async function writeBlocks(groups, usage) {
  * Draft (or return the existing) prep plan for one volunteer and one session.
  *
  * Idempotent by default: if a draft or approved plan already exists it is
- * returned untouched. `force` supersedes it and drafts afresh — the old one is
- * kept with status 'superseded', not deleted.
+ * returned untouched. `force` supersedes it and drafts afresh (the old one is
+ * kept with status 'superseded', not deleted).
  */
 async function prepareSession({ session, volunteer, force = false }) {
-  const existing = await LessonPlanDraft.findOne({
-    sessionId: session._id,
-    volunteerId: volunteer._id,
-    status: { $in: ['draft', 'approved'] }
-  });
+  const db = getDb();
+  const [existing] = await db
+    .select()
+    .from(lessonPlanDrafts)
+    .where(
+      and(
+        eq(lessonPlanDrafts.sessionId, session.id),
+        eq(lessonPlanDrafts.volunteerId, volunteer.id),
+        inArray(lessonPlanDrafts.status, ['draft', 'approved'])
+      )
+    )
+    .limit(1);
   if (existing && !force) return { draft: existing, created: false };
 
   const started = Date.now();
@@ -272,30 +266,34 @@ async function prepareSession({ session, volunteer, force = false }) {
   );
   const focusGroups = await timed('write', () => writeBlocks(withPassages, usage), 'blocks written');
 
-  // Resolve names → ids for the students we kept.
+  // Resolve names -> ids for the students we kept.
   const names = [...new Set(focusGroups.flatMap((g) => g.students.map((s) => s.name)))];
-  const docs = await Student.find({ name: { $in: names } }).select('name').lean();
-  const idByName = new Map(docs.map((d) => [d.name, d._id]));
+  const docs = names.length > 0 ? await db.select({ id: students.id, name: students.name }).from(students).where(inArray(students.name, names)) : [];
+  const idByName = new Map(docs.map((d) => [d.name, d.id]));
   for (const g of focusGroups) {
     g.students = g.students.map((s) => ({ name: s.name, studentId: idByName.get(s.name) || null }));
   }
 
   if (existing && force) {
-    existing.status = 'superseded';
-    await existing.save();
+    await db.update(lessonPlanDrafts).set({ status: 'superseded' }).where(eq(lessonPlanDrafts.id, existing.id));
   }
 
-  const draft = await LessonPlanDraft.create({
-    sessionId: session._id,
-    volunteerId: volunteer._id,
-    status: 'draft',
-    focusGroups,
-    contextSummary: context.summary,
-    trace,
-    usage,
-    generatedBy: { provider: CHAT_PROVIDER, model: CHAT_MODEL },
-    durationMs: Date.now() - started
-  });
+  const [draft] = await db
+    .insert(lessonPlanDrafts)
+    .values({
+      sessionId: session.id,
+      volunteerId: volunteer.id,
+      status: 'draft',
+      focusGroups,
+      contextSummary: context.summary,
+      trace,
+      promptTokens: usage.promptTokens,
+      completionTokens: usage.completionTokens,
+      provider: CHAT_PROVIDER,
+      model: CHAT_MODEL,
+      durationMs: Date.now() - started
+    })
+    .returning();
 
   return { draft, created: true };
 }

@@ -1,38 +1,36 @@
-const AttendanceSession = require('../models/AttendanceSession');
+const { eq, desc, sql } = require('drizzle-orm');
+const { getDb } = require('../db');
+const { attendanceSessions, users } = require('../db/schema');
+const { withId, withIds } = require('../db/serialize');
 
 // How long an issued code stays valid.
 const CODE_TTL_MS = 10 * 60 * 1000;
 
 // The code exists to prove a volunteer is physically in the room, so only
-// coordinators may read it. Returning it to everyone made it prove nothing:
-// any volunteer could pull it from the API from anywhere.
+// coordinators may read it.
 const withoutCode = (session) => {
   const { activeCode, codeExpiry, ...rest } = session;
   return rest;
 };
 
-const forViewer = (sessions, user) =>
-  user?.role === 'admin' ? sessions : sessions.map(withoutCode);
+const forViewer = (sessions, user) => (user?.role === 'admin' ? sessions : sessions.map(withoutCode));
 
-// Four digits, read out loud across a noisy classroom and typed on a phone.
-//
-// This used to be five characters drawn from the alphabet and the digits, which
-// made every code a spelling test: B and D and P sound alike shouted across a
-// room, 0 and O and 1 and I look alike on a phone, and a volunteer who mishears
-// one character has to ask again while the ten-minute window runs down. Digits
-// have no homographs and a number pad to type them on. The code is not the
-// security boundary — the geofence, the session window, the ten-minute expiry
-// and the registration check are — it only has to prove someone is in the room
-// to hear it.
+// Four digits — see the original reasoning in this file's git history: no
+// homographs read aloud across a room, a number pad to type them on. The code
+// is not the security boundary; geofence + session window + expiry + the
+// registration check are.
 const CODE_LENGTH = 4;
 
 const generateRandomCode = () => {
   let code = '';
-  for (let i = 0; i < CODE_LENGTH; i++) {
-    code += String(Math.floor(Math.random() * 10));
-  }
+  for (let i = 0; i < CODE_LENGTH; i++) code += String(Math.floor(Math.random() * 10));
   return code;
 };
+
+const withCreatedBy = (row) => ({
+  ...withId(row.session),
+  createdBy: row.creatorId ? { _id: row.creatorId, id: row.creatorId, name: row.creatorName, email: row.creatorEmail } : row.session.createdBy
+});
 
 // @desc    Create new attendance session
 // @route   POST /api/attendance-sessions/create
@@ -41,34 +39,28 @@ exports.createSession = async (req, res, next) => {
   try {
     const { title, startTime, endTime, location } = req.body;
 
-    // Validate required fields
     if (!title || !startTime || !endTime) {
-      return res.status(400).json({
-        success: false,
-        message: 'Title, start time, and end time are required'
-      });
+      return res.status(400).json({ success: false, message: 'Title, start time, and end time are required' });
     }
 
-    // Validate time range
     if (new Date(startTime) >= new Date(endTime)) {
-      return res.status(400).json({
-        success: false,
-        message: 'End time must be after start time'
-      });
+      return res.status(400).json({ success: false, message: 'End time must be after start time' });
     }
 
-    const session = await AttendanceSession.create({
-      title,
-      startTime: new Date(startTime),
-      endTime: new Date(endTime),
-      location: location || { lat: null, lng: null },
-      createdBy: req.user.id
-    });
+    const db = getDb();
+    const [session] = await db
+      .insert(attendanceSessions)
+      .values({
+        title,
+        startTime: new Date(startTime),
+        endTime: new Date(endTime),
+        lat: location?.lat ?? null,
+        lng: location?.lng ?? null,
+        createdBy: req.user.id
+      })
+      .returning();
 
-    res.status(201).json({
-      success: true,
-      data: session
-    });
+    res.status(201).json({ success: true, data: withId(session) });
   } catch (error) {
     next(error);
   }
@@ -79,30 +71,21 @@ exports.createSession = async (req, res, next) => {
 // @access  Private (Admin only)
 exports.generateCode = async (req, res, next) => {
   try {
-    const session = await AttendanceSession.findById(req.params.id);
-
-    if (!session) {
-      return res.status(404).json({
-        success: false,
-        message: 'Session not found'
-      });
-    }
-
-    // Generate new code
+    const db = getDb();
     const code = generateRandomCode();
     const expiry = new Date(Date.now() + CODE_TTL_MS);
 
-    session.activeCode = code;
-    session.codeExpiry = expiry;
-    await session.save();
+    const [session] = await db
+      .update(attendanceSessions)
+      .set({ activeCode: code, codeExpiry: expiry })
+      .where(eq(attendanceSessions.id, req.params.id))
+      .returning({ id: attendanceSessions.id });
 
-    res.status(200).json({
-      success: true,
-      data: {
-        code,
-        expiry
-      }
-    });
+    if (!session) {
+      return res.status(404).json({ success: false, message: 'Session not found' });
+    }
+
+    res.status(200).json({ success: true, data: { code, expiry } });
   } catch (error) {
     next(error);
   }
@@ -113,67 +96,51 @@ exports.generateCode = async (req, res, next) => {
 // @access  Private
 exports.getAllSessions = async (req, res, next) => {
   try {
-    const sessions = await AttendanceSession.find()
-      .populate('createdBy', 'name email')
-      .sort({ startTime: -1 })
-      .lean();
+    const db = getDb();
+    const rows = await db
+      .select({
+        session: attendanceSessions,
+        creatorId: users.id,
+        creatorName: users.name,
+        creatorEmail: users.email
+      })
+      .from(attendanceSessions)
+      .leftJoin(users, eq(attendanceSessions.createdBy, users.id))
+      .orderBy(desc(attendanceSessions.startTime));
 
     const now = new Date();
-
-    // Rotate codes for any running session whose code has lapsed.
-    //
-    // The client polls this endpoint, so this ran on every poll. It used to
-    // `await session.save()` one session at a time inside the loop, adding a
-    // serial round trip per session even though the writes are independent.
-    // Now the whole rotation is a single bulkWrite, and sessions that already
-    // hold a valid code cost nothing at all.
-    //
-    // A code from before the switch to four digits counts as stale even if it
-    // has not expired yet: the field screen only accepts digits now, so leaving
-    // an old alphanumeric code in place would lock volunteers out of a live
-    // session for the rest of its ten-minute window.
     const isCurrentFormat = (code) => /^\d{4}$/.test(code || '');
 
-    const stale = sessions.filter((session) => {
+    const stale = rows.filter(({ session }) => {
       const isActive = now >= session.startTime && now <= session.endTime;
       const hasValidCode =
-        session.activeCode &&
-        isCurrentFormat(session.activeCode) &&
-        session.codeExpiry &&
-        now < session.codeExpiry;
+        session.activeCode && isCurrentFormat(session.activeCode) && session.codeExpiry && now < session.codeExpiry;
       return isActive && !hasValidCode;
     });
 
     if (stale.length > 0) {
       const expiry = new Date(Date.now() + CODE_TTL_MS);
+      const updates = stale.map(({ session }) => {
+        const code = generateRandomCode();
+        session.activeCode = code;
+        session.codeExpiry = expiry;
+        return { id: session.id, code };
+      });
 
-      await AttendanceSession.bulkWrite(
-        stale.map((session) => {
-          // Mutate the copy we are about to send so the response carries the
-          // fresh code without re-reading it.
-          session.activeCode = generateRandomCode();
-          session.codeExpiry = expiry;
-
-          return {
-            updateOne: {
-              filter: { _id: session._id },
-              update: {
-                $set: {
-                  activeCode: session.activeCode,
-                  codeExpiry: expiry
-                }
-              }
-            }
-          };
-        })
+      // One statement for the whole rotation, same as the original bulkWrite —
+      // sessions that already hold a valid code cost nothing at all.
+      const rowsSql = sql.join(
+        updates.map((u) => sql`(${u.id}::uuid, ${u.code}::text)`),
+        sql`, `
+      );
+      await db.execute(
+        sql`UPDATE ${attendanceSessions} AS a SET active_code = v.code, code_expiry = ${expiry}
+            FROM (VALUES ${rowsSql}) AS v(id, code) WHERE a.id = v.id`
       );
     }
 
-    res.status(200).json({
-      success: true,
-      count: sessions.length,
-      data: forViewer(sessions, req.user)
-    });
+    const sessions = forViewer(rows.map(withCreatedBy), req.user);
+    res.status(200).json({ success: true, count: sessions.length, data: sessions });
   } catch (error) {
     next(error);
   }
@@ -184,21 +151,20 @@ exports.getAllSessions = async (req, res, next) => {
 // @access  Private
 exports.getSession = async (req, res, next) => {
   try {
-    const session = await AttendanceSession.findById(req.params.id)
-      .populate('createdBy', 'name email')
-      .lean();
+    const db = getDb();
+    const [row] = await db
+      .select({ session: attendanceSessions, creatorId: users.id, creatorName: users.name, creatorEmail: users.email })
+      .from(attendanceSessions)
+      .leftJoin(users, eq(attendanceSessions.createdBy, users.id))
+      .where(eq(attendanceSessions.id, req.params.id))
+      .limit(1);
 
-    if (!session) {
-      return res.status(404).json({
-        success: false,
-        message: 'Session not found'
-      });
+    if (!row) {
+      return res.status(404).json({ success: false, message: 'Session not found' });
     }
 
-    res.status(200).json({
-      success: true,
-      data: req.user?.role === 'admin' ? session : withoutCode(session)
-    });
+    const session = withCreatedBy(row);
+    res.status(200).json({ success: true, data: req.user?.role === 'admin' ? session : withoutCode(session) });
   } catch (error) {
     next(error);
   }
@@ -209,21 +175,17 @@ exports.getSession = async (req, res, next) => {
 // @access  Private (Admin only)
 exports.deleteSession = async (req, res, next) => {
   try {
-    const session = await AttendanceSession.findById(req.params.id);
+    const db = getDb();
+    const [session] = await db
+      .delete(attendanceSessions)
+      .where(eq(attendanceSessions.id, req.params.id))
+      .returning({ id: attendanceSessions.id });
 
     if (!session) {
-      return res.status(404).json({
-        success: false,
-        message: 'Session not found'
-      });
+      return res.status(404).json({ success: false, message: 'Session not found' });
     }
 
-    await session.deleteOne();
-
-    res.status(200).json({
-      success: true,
-      message: 'Session deleted successfully'
-    });
+    res.status(200).json({ success: true, message: 'Session deleted successfully' });
   } catch (error) {
     next(error);
   }
