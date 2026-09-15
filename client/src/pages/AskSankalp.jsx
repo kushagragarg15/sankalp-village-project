@@ -366,7 +366,7 @@ export default function AskSankalp() {
         }
       />
 
-      <div className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]">
         <div className="order-2 lg:order-1">
           <History
             items={history}
