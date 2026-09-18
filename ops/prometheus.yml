@@ -1,0 +1,11 @@
+# Scrape config used by the `monitoring` compose profile.
+# The API exposes http_request_duration_seconds / http_requests_total plus
+# Node process metrics at /metrics (server/middleware/metrics.js).
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: sankalp-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["server:5000"]

@@ -4,10 +4,15 @@
 // ValidationError). Now maps the PostgreSQL error codes `pg` throws instead,
 // keeping the same response shape and, where practical, the same status code
 // a given failure used to produce.
+const logger = require('../utils/logger');
+
 const errorHandler = (err, req, res, next) => {
   let error = { message: err.message };
 
-  console.error(err);
+  // req.log is the request-scoped child logger from pino-http (carries the
+  // request id); fall back to the root logger if the error came from before
+  // that middleware ran.
+  (req.log || logger).error({ err }, err.message);
 
   // drizzle-orm's node-postgres driver wraps the raw `pg` error (which carries
   // the Postgres error code) in `DrizzleQueryError.cause` rather than copying

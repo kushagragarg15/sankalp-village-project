@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const logger = require('../utils/logger');
 
 // Mirrors config/db.js's reasoning for Mongo: fail fast instead of hanging,
 // keep a warm pool so requests skip the TCP/TLS handshake.
@@ -19,7 +20,7 @@ const getPool = () => {
   pool.on('error', (err) => {
     // Idle client errors (e.g. the pooled connection was dropped by the
     // server) must not crash the process — log and let the pool recover.
-    console.error('Unexpected PostgreSQL pool error:', err.message);
+    logger.error({ err }, 'Unexpected PostgreSQL pool error');
   });
   return pool;
 };
@@ -29,9 +30,9 @@ const connectPG = async () => {
     const client = await getPool().connect();
     const { rows } = await client.query('SELECT current_database() AS db, version() AS version');
     client.release();
-    console.log(`PostgreSQL connected: ${rows[0].db}`);
+    logger.info({ database: rows[0].db }, 'PostgreSQL connected');
   } catch (error) {
-    console.error(`Error: ${error.message}`);
+    logger.fatal({ err: error }, 'PostgreSQL connection failed');
     process.exit(1);
   }
 };

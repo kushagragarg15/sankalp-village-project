@@ -29,6 +29,9 @@ Three services, one PostgreSQL database:
   - [Evals](#evals)
 - [Frontend structure](#frontend-structure)
 - [Getting started](#getting-started)
+  - [Run with Docker](#run-with-docker)
+- [Testing](#testing)
+- [Logging and metrics](#logging-and-metrics)
 - [Configuration reference](#configuration-reference)
 - [API reference](#api-reference)
 - [Scripts](#scripts)
@@ -884,6 +887,21 @@ npm run dev                 # vite, http://localhost:5173
 
 Health checks: `GET http://localhost:5000/health` (no DB touch) and `GET|HEAD http://localhost:8000/health` (reports Postgres reachability and whether pgvector is installed).
 
+### Run with Docker
+
+The backend half of the stack (PostgreSQL + pgvector, the API, the AI service) is containerised; the client stays on the host under Vite, which proxies `/api` to `:5000`.
+
+```bash
+docker compose up --build        # db → migrate (one-shot) → ai-service → server
+cd client && npm run dev         # http://localhost:5173
+```
+
+- `server/Dockerfile` and `ai-service/Dockerfile` build small images (`node:22-alpine`, `python:3.12-slim`), run as non-root users and carry `HEALTHCHECK`s against the same `/health` endpoints the uptime monitor uses.
+- The `migrate` service applies `server/db/migrations` and exits; `server` waits for it to succeed. Re-runs are no-ops.
+- `ai-service` is not published on the host — only the API container can reach it, which is the intended production topology.
+- Secrets and LLM keys are read from `server/.env` / `ai-service/.env` if present; every variable needed to boot has a dev default in `docker-compose.yml`. `MONGO_URI` is unset, so the legacy Mongo connection is skipped.
+- `docker compose --profile monitoring up` adds a Prometheus container (http://localhost:9090) scraping the API every 15 s (`ops/prometheus.yml`).
+
 ### Demo accounts
 
 `npm run seed-club-data` writes a term of sessions, registrations, teaching logs and quiz scores from August 2026 up to today, for:
@@ -897,6 +915,44 @@ Accounts that have signed in with Google, and any super admin, are never touched
 ```sql
 UPDATE users SET is_super_admin = true WHERE email = 'you@example.com';
 ```
+
+---
+
+## Testing
+
+```bash
+cd server
+npm test                 # jest — 36 tests, ~10 s, no database or network
+npm run test:coverage    # + lcov report
+```
+
+The API is built by `server/app.js` (`createApp()`), which opens no connection and listens on no port; `server.js` is the thin production entry that connects and listens. Tests mount the app under [Supertest](https://github.com/ladjs/supertest) with `db/index.js` replaced by a queued mock (`tests/helpers/mockDb.js`) that stands in for Drizzle's query builder, so each test states exactly which rows each query returns.
+
+| Suite | Covers |
+|---|---|
+| `tests/auth.test.js` | `protect` (Bearer and cookie transports, wrong secret, deleted user, non-uuid short-circuit, user cache) and `authorize` role gate |
+| `tests/teachingLogs.test.js` | the attendance write path end to end: body validation, session window, registration, code match and expiry, missing location, geofence distance, per-session location override, single-statement insert with duplicate count |
+| `tests/aiBudget.test.js` | sliding-window rate limit (per user, `Retry-After`), daily token budget from persisted spend (headers, 429, cache and invalidation, DB failure forwarded) |
+| `tests/errorHandler.test.js` | PostgreSQL error-code → HTTP status mapping, wrapped Drizzle errors, stack only in development |
+| `tests/health.test.js` | `/health`, `/metrics` output, `X-Request-Id` echo, 404 fall-through |
+
+Retrieval and generation quality are covered separately by the [evals](#evals).
+
+---
+
+## Logging and metrics
+
+**Logs** are structured JSON lines from [pino](https://getpino.io) (`server/utils/logger.js`), pretty-printed when `NODE_ENV=development`. `server/middleware/requestLogger.js` (pino-http) writes one line per request with method, path, status, duration and `userId`, and assigns every request an id: the caller's `X-Request-Id` if it sent one, otherwise a fresh uuid. The id is echoed on the response, attached to the error handler's log line, and forwarded to `ai-service`, which tags its own logs and response with it — one id follows a request browser → Node → Python. `/health` and `/metrics` are not logged. Secrets (`authorization`, `cookie`, `password`, `token`, `activeCode`) are redacted before the line is written. `LOG_LEVEL` (default `info`; `silent` in tests) and `LOG_FORMAT=json` control output; the MCP server forces the destination to stderr because stdout is its wire.
+
+**Metrics** are exposed for Prometheus at `GET /metrics` (`server/middleware/metrics.js`, prom-client):
+
+| Metric | Type | Labels |
+|---|---|---|
+| `http_request_duration_seconds` | histogram | `method`, `route` (the mounted pattern, e.g. `/api/students/:id`), `status_code` |
+| `http_requests_total` | counter | same |
+| `process_*`, `nodejs_*` | gauges/counters | prom-client defaults: CPU, memory, event-loop lag, handles |
+
+Histogram buckets run 10 ms – 30 s so both the ordinary API (one database round trip) and the AI routes (seconds) land somewhere useful. Route labels use the Express pattern rather than the raw URL so cardinality stays one series per endpoint.
 
 ---
 
@@ -916,8 +972,9 @@ UPDATE users SET is_super_admin = true WHERE email = 'you@example.com';
 | `AI_RATE_LIMIT_REQUESTS`, `AI_RATE_LIMIT_WINDOW_MS`, `AI_DAILY_TOKEN_BUDGET_PER_USER` | server | Guardrails |
 | `SCHOOL_LAT`, `SCHOOL_LNG`, `ATTENDANCE_RADIUS_M` | server | Default geofence when a session has no location (1000 m) |
 | `USER_CACHE_TTL_MS` | server | `protect()` user cache (15 s) |
+| `LOG_LEVEL`, `LOG_FORMAT`, `LOG_DESTINATION` | server | pino level (default `info`); `json` to disable pretty output in development; `stderr` (set by the MCP server) |
 | `MCP_USER_EMAIL` | MCP server | Which Sankalp user the MCP server acts as |
-| `MONGO_URI` | server | Legacy — see Migration notes |
+| `MONGO_URI` | server | Legacy, optional — unset skips the connection; see Migration notes |
 
 ---
 
@@ -1001,6 +1058,7 @@ Run from `server/`:
 | Command | What it does |
 |---|---|
 | `npm run dev` / `npm start` | API with nodemon / plain node |
+| `npm test` / `npm run test:coverage` | Jest + Supertest suite (see [Testing](#testing)) |
 | `npm run db:generate` | `drizzle-kit generate` — new migration from `db/schema.js` |
 | `npm run db:migrate` | apply `db/migrations/*.sql` (tracked in `drizzle.__drizzle_migrations`) |
 | `npm run seed-club-data` | rebuild a term of realistic data (keeps Google-linked and super-admin accounts) |
@@ -1032,6 +1090,8 @@ flowchart LR
 - The API sets `secure` / `sameSite: 'none'` cookies in production; `CLIENT_URL` must be the exact Vercel origin.
 - `ai-service` should not be reachable from the public internet — nothing but Node needs it, and its auth is a shared secret.
 - Free-tier hosts sleep after idle; both `/health` endpoints exist so an uptime monitor can keep them warm.
+- Any container host works too: both services ship a `Dockerfile` (see [Run with Docker](#run-with-docker)). Point a Prometheus scraper at the API's `/metrics` and ship its stdout JSON lines to your log store.
+- The API handles `SIGTERM` by closing the listener and letting in-flight requests finish, so rolling deploys do not drop connections.
 - Changing the embedding provider/model in production requires re-running `npm run seed-resources` (or re-ingesting your own resources), otherwise retrieval finds no chunks stamped with the new model.
 
 ---
@@ -1053,7 +1113,10 @@ sankalps-village-project/
 │   └── vite.config.js              # /api → localhost:5000 dev proxy
 │
 ├── server/                         # Express API (CommonJS)
-│   ├── server.js                   # entry — mounts routers, /health
+│   ├── server.js                   # entry — connects PG, listens, SIGTERM shutdown
+│   ├── app.js                      # createApp(): middleware, routers, /health, /metrics (no I/O)
+│   ├── Dockerfile                  # node:22-alpine, non-root, HEALTHCHECK
+│   ├── tests/                      # jest + supertest (auth, attendance write path, AI budget, errors, ops)
 │   ├── db/
 │   │   ├── schema.js               # Drizzle schema (every table, index, check)
 │   │   ├── migrations/             # generated SQL + snapshots
@@ -1062,7 +1125,9 @@ sankalps-village-project/
 │   ├── routes/                     # auth, users, students, analytics, ai, prep,
 │   │                               # attendanceSessions, registrations, teachingLogs, volunteerAttendance
 │   ├── controllers/                # one per router (+ aiAdminController)
-│   ├── middleware/                 # auth.js (protect/authorize + user cache), aiBudget.js, errorHandler.js
+│   ├── middleware/                 # auth.js (protect/authorize + user cache), aiBudget.js, errorHandler.js,
+│   │                               # requestLogger.js (pino-http + X-Request-Id), metrics.js (prom-client)
+│   ├── utils/logger.js             # pino root logger (JSON in prod, pretty in dev, redaction)
 │   ├── services/
 │   │   ├── aiServiceClient.js      # Node → Python: headers, timeouts, error translation, SSE pass-through
 │   │   ├── ragService.js           # thin proxy to /rag/*
@@ -1088,8 +1153,11 @@ sankalps-village-project/
 │   │   │                           # generation, ingest, chat (ChatOpenAI + retry)
 │   │   ├── tools/                  # the 7 LangChain tools + role metadata
 │   │   └── agent/                  # graph.py (LangGraph), runner.py, history.py, persistence.py, prompt.py
+│   ├── Dockerfile                  # python:3.12-slim, non-root, HEALTHCHECK
 │   └── requirements.txt
 │
+├── docker-compose.yml              # db (pgvector) → migrate → ai-service → server [+ prometheus profile]
+├── ops/prometheus.yml              # scrape config for the monitoring profile
 ├── .env.example                    # server env template
 ├── AI_AGENTS_GUIDE.md              # beginner-friendly deep dive into the agent, tools, RAG and workflow
 ├── CLAUDE.md                       # guidance for AI coding assistants working in this repo

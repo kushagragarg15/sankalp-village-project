@@ -152,7 +152,9 @@ exports.askAgent = async (req, res, next) => {
       return res.status(503).json({ success: false, message: notConfiguredMessage() });
     }
 
-    const requestId = crypto.randomUUID();
+    // Reuse the id pino-http assigned to this HTTP request so the Node access
+    // log and the Python service's log share one id.
+    const requestId = req.id || crypto.randomUUID();
     const result = await callAiService('/agent/ask', {
       method: 'POST',
       user: req.user,
@@ -185,7 +187,9 @@ exports.askAgentStream = async (req, res, next) => {
     return res.status(503).json({ success: false, message: notConfiguredMessage() });
   }
 
-  const requestId = crypto.randomUUID();
+  // Reuse the id pino-http assigned to this HTTP request so the Node access
+  // log and the Python service's log share one id.
+  const requestId = req.id || crypto.randomUUID();
   const abortController = new AbortController();
   req.on('close', () => abortController.abort());
 

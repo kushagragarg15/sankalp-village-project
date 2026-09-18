@@ -25,6 +25,7 @@
 console.log = (...args) => console.error(...args);
 console.info = (...args) => console.error(...args);
 process.env.RAG_QUIET = '1';
+process.env.LOG_DESTINATION = 'stderr';
 
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });

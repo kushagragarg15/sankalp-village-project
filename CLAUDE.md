@@ -9,7 +9,7 @@ Two independent npm packages, no workspace/monorepo tooling:
 - `server/` — Express + Mongoose REST API (CommonJS, `require`). Entry: `server/server.js`.
 - `client/` — React 18 + Vite SPA (ESM, `"type": "module"`). Entry: `client/src/main.jsx`.
 
-There is **no build step, linter, or unit-test suite** in this project. `npm test` is not defined. Verification is manual (run both servers, exercise the UI/API) — except for the AI features, which have **evals**: `npm run eval:retrieval` and `npm run eval:generation` in `server/evals/` (see its README). Run the retrieval eval after any change to retrieval, chunking, thresholds or the embedding model.
+There is no build step or linter. `npm test` in `server/` runs the **Jest + Supertest suite** (`server/tests/`, no database or network — `db/index.js` is mocked via `tests/helpers/mockDb.js`); run it after touching middleware, controllers or `app.js`. The app is built by `server/app.js` (`createApp()`, no I/O) and `server/server.js` is the entry that connects and listens — keep new middleware/routers in `app.js` so tests see them. Beyond that, verification is manual (run both servers, exercise the UI/API) — except for the AI features, which have **evals**: `npm run eval:retrieval` and `npm run eval:generation` in `server/evals/` (see its README). Run the retrieval eval after any change to retrieval, chunking, thresholds or the embedding model.
 
 ## Commands
 
@@ -19,6 +19,8 @@ Run from `server/`:
 npm install
 npm run dev                    # nodemon server.js  (http://localhost:5000)
 npm start                      # node server.js (production)
+npm test                       # jest + supertest (server/tests), ~10 s, no DB
+npm run test:coverage
 
 # DB utility scripts (each connects using MONGO_URI, does its work, exits):
 npm run seed-club-data         # rebuild a realistic term of weekend sessions, students and
@@ -60,7 +62,9 @@ The Vite dev server proxies `/api` -> `http://localhost:5000`, so the client wor
 
 `server/.env` (see `.env.example`; `server/.env` is gitignored):
 
-- `MONGO_URI` (required) — a running MongoDB, local or Atlas.
+- `MONGO_URI` (optional, legacy) — if set, server.js still opens the Mongoose connection; unset skips it. Nothing reads Mongo except `scripts/migrateToPg.js`.
+- `DATABASE_URL` (required) — PostgreSQL with pgvector; `DATABASE_SSL=false` for local.
+- `LOG_LEVEL` / `LOG_FORMAT` — pino (`server/utils/logger.js`). Use `req.log` (request-scoped, carries `X-Request-Id`) or `require('../utils/logger')` instead of `console.*` in server code; the MCP server sets `LOG_DESTINATION=stderr` because stdout is its wire.
 - `JWT_SECRET` (required) — signs auth tokens.
 - `CLIENT_URL` — CORS origin allowlist, default `http://localhost:5173`.
 - **LLM keys** — needed only for the AI features (`/api/ai/*` and `seed-resources`); the rest of the app runs without them. `server/services/llmClient.js` is the single place that knows about providers. `LLM_PROVIDER` = `groq` | `gemini` | `openai` picks the chat provider (auto-detects the first with a key, in that order); `EMBEDDING_PROVIDER` = `gemini` | `openai` picks embeddings (Groq has none). Keys: `GROQ_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`. `LLM_CHAT_MODEL` / `LLM_EMBEDDING_MODEL` override model names. All providers are called through the `openai` SDK via their OpenAI-compatible endpoints.
@@ -153,7 +157,7 @@ gather (agent tools as plain functions) → plan (LLM, JSON, zod) → retrieve (
 
 ### Backend request path
 
-`routes/*.js` (thin, wires middleware) → `controllers/*.js` (all logic, `async` with `try/catch`, calls `next(err)`) → Mongoose models. `middleware/errorHandler.js` is the last-registered middleware and formats all errors as `{ success: false, message }`. Responses are consistently `{ success, data | message }`.
+`app.js` → `requestLogger` (pino-http, `X-Request-Id`) → `httpMetrics` (prom-client, `/metrics`) → `routes/*.js` (thin, wires middleware) → `controllers/*.js` (all logic, `async` with `try/catch`, calls `next(err)`) → Drizzle (`getDb()`). `middleware/errorHandler.js` is the last-registered middleware and formats all errors as `{ success: false, message }`. Responses are consistently `{ success, data | message }`.
 
 ### Frontend
 
@@ -161,6 +165,10 @@ gather (agent tools as plain functions) → plan (LLM, JSON, zod) → retrieve (
 - `client/src/context/AuthContext.jsx` — the only global state (user, `login`, `logout`, `loading`); calls `/api/auth/me` on load. Zustand is a dependency but state is Context-based.
 - `client/src/utils/api.js` — every backend call goes through this one Axios instance and its named helper functions; add new endpoints here, not with ad-hoc `axios`/`fetch`.
 - `client/src/components/` — presentational primitives (`Button`, `Card`, `Table`, `Modal`, `Input`, `Badge`, `EmptyState`, `Layout`, `Sidebar`). Styling is Tailwind utilities only. Pages hold their own data-fetching and loading/error state.
+
+## Containers
+
+`docker compose up --build` at the repo root starts pgvector Postgres, a one-shot `migrate` service, `ai-service` (not published on the host) and `server` on :5000; `--profile monitoring` adds Prometheus scraping `/metrics`. `server/Dockerfile` and `ai-service/Dockerfile` run as non-root with `HEALTHCHECK`s. Lockfiles are gitignored, so the Node image uses `npm install --omit=dev`, not `npm ci`.
 
 ## Conventions & gotchas
 
