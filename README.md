@@ -580,6 +580,8 @@ Registration is refused once a session has ended; attendance is refused outside 
 
 ## AI features
 
+> New to agents, tools or RAG? **[AI_AGENTS_GUIDE.md](AI_AGENTS_GUIDE.md)** explains every AI feature below from first principles, with worked examples and a step-by-step guide to adding a tool.
+
 Provider selection is one env var. Every provider speaks the OpenAI wire format, so both Node (`openai` SDK) and Python (`langchain-openai`) use a single client with a different `base_url`:
 
 | `LLM_PROVIDER` | Chat model | Embeddings | Notes |
@@ -1089,6 +1091,7 @@ sankalps-village-project/
 │   └── requirements.txt
 │
 ├── .env.example                    # server env template
+├── AI_AGENTS_GUIDE.md              # beginner-friendly deep dive into the agent, tools, RAG and workflow
 ├── CLAUDE.md                       # guidance for AI coding assistants working in this repo
 ├── RAG_NOTES.md                    # RAG implementation notes
 └── README.md
