@@ -1181,4 +1181,6 @@ Removing `connectDB()`, `config/db.js`, `models/`, the two legacy scripts and th
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+**Proprietary and Confidential** — All rights reserved.
+
+This software is proprietary to Sankalp. No permission is granted to use, copy, modify, or distribute without prior written authorization. See [LICENSE](LICENSE) for full terms.
