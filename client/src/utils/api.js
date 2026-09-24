@@ -41,7 +41,6 @@ api.interceptors.response.use(
 
 // Attendance Session API
 export const authAPI = {
-  demoOptions: () => api.get('/auth/demo'),
   demoLogin: (role) => api.post('/auth/demo', { role })
 };
 

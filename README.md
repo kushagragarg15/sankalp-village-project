@@ -910,7 +910,7 @@ cd client && npm run dev         # http://localhost:5173
 - **10 students** across Classes 3–5
 - Password for every seeded account: **`Sankalp@2026`**
 
-**One-click demo.** Set `DEMO_VOLUNTEER_EMAIL` and `DEMO_COORDINATOR_EMAIL` in `server/.env` (e.g. the two accounts above) and the login page shows **Demo as volunteer** / **Demo as coordinator** buttons — no password needed. The server checks that each account already has the matching role (it never grants one, and never hands out a super admin), demo sessions expire after 4 hours, and a demo coordinator can view the Volunteers page but not add, edit or remove anyone.
+**One-click demo.** The login page has **Demo as volunteer** / **Demo as coordinator** buttons — no password needed. They sign into `23ucc501@lnmiit.ac.in` and `22ucc430@lnmiit.ac.in` by default (override with `DEMO_VOLUNTEER_EMAIL` / `DEMO_COORDINATOR_EMAIL`; set one to an empty string to turn it off). The server checks that each account already has the matching role (it never grants one, and never hands out a super admin), demo sessions expire after 4 hours, and a demo coordinator can view the Volunteers page but not add, edit or remove anyone.
 
 Accounts that have signed in with Google, and any super admin, are never touched by the seed. To make someone a super admin (able to change roles in the UI):
 
