@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { authAPI } from '../utils/api';
 import { GoogleOAuthProvider, GoogleLogin, useGoogleOAuth } from '@react-oauth/google';
 import DotGrid from '../components/DotGrid';
 import logoImage from '../assets/sankalp-logo.jpg';
@@ -61,6 +62,24 @@ function SpinnerIcon({ className = '' }) {
       <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" opacity="0.25" />
       <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
     </svg>
+  );
+}
+
+function DemoButton({ label, detail, pending, disabled, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-busy={pending}
+      className="flex min-h-[3.5rem] w-full flex-col items-start justify-center rounded-md border border-rule-strong bg-paper px-3.5 py-2.5 text-left transition-colors duration-150 hover:border-board hover:bg-surface active:bg-paper-deep disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      <span className="flex items-center gap-2 text-sm font-medium text-ink">
+        {pending && <SpinnerIcon className="text-ink-2" />}
+        {pending ? 'Opening demo' : label}
+      </span>
+      <span className="mt-0.5 text-[12px] text-ink-3">{detail}</span>
+    </button>
   );
 }
 
@@ -137,10 +156,40 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleScriptFailed, setGoogleScriptFailed] = useState(false);
-  const { login } = useAuth();
+  const [demoOptions, setDemoOptions] = useState({ volunteer: false, coordinator: false });
+  const [demoRole, setDemoRole] = useState(null);
+  const { login, demoLogin } = useAuth();
   const navigate = useNavigate();
 
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+  const busy = loading || demoRole !== null;
+  const demoAvailable = demoOptions.volunteer || demoOptions.coordinator;
+
+  // The server decides which demo accounts exist; the panel only appears
+  // when at least one is configured.
+  useEffect(() => {
+    let cancelled = false;
+    authAPI
+      .demoOptions()
+      .then((res) => !cancelled && setDemoOptions(res.data.data))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleDemo = async (role) => {
+    setError('');
+    setDemoRole(role);
+    const result = await demoLogin(role);
+    setDemoRole(null);
+
+    if (result.success) {
+      navigate('/dashboard');
+    } else {
+      setError(result.message);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -304,6 +353,37 @@ export default function Login() {
               Use the account your coordinator set up for you.
             </p>
 
+            {demoAvailable && (
+              <section aria-labelledby="demo-heading" className="mt-7 rounded-md border border-rule bg-surface p-4">
+                <h2 id="demo-heading" className="type-title text-[14px] text-ink">
+                  Just looking around?
+                </h2>
+                <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
+                  Open the app with sample data — no account needed.
+                </p>
+                <div className="mt-3.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {demoOptions.volunteer && (
+                    <DemoButton
+                      label="Demo as volunteer"
+                      detail="Register, log a lesson, ask the AI"
+                      pending={demoRole === 'volunteer'}
+                      disabled={busy}
+                      onClick={() => handleDemo('volunteer')}
+                    />
+                  )}
+                  {demoOptions.coordinator && (
+                    <DemoButton
+                      label="Demo as coordinator"
+                      detail="Run sessions, analytics, AI activity"
+                      pending={demoRole === 'coordinator'}
+                      disabled={busy}
+                      onClick={() => handleDemo('coordinator')}
+                    />
+                  )}
+                </div>
+              </section>
+            )}
+
             {error && (
               <div
                 role="alert"
@@ -314,7 +394,15 @@ export default function Login() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="mt-7 space-y-4" noValidate>
+            {demoAvailable && (
+              <div className="mt-7 flex items-center gap-3">
+                <span className="h-px flex-1 bg-rule" />
+                <span className="text-[13px] text-ink-3">or sign in with your account</span>
+                <span className="h-px flex-1 bg-rule" />
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className={`${demoAvailable ? 'mt-5' : 'mt-7'} space-y-4`} noValidate>
               <div>
                 <label htmlFor="email" className="block text-[13px] font-medium text-ink mb-1.5">
                   Email
@@ -324,7 +412,7 @@ export default function Login() {
                   type="email"
                   autoComplete="email"
                   value={email}
-                  disabled={loading}
+                  disabled={busy}
                   onChange={(e) => {
                     setEmail(e.target.value);
                     setError('');
@@ -347,7 +435,7 @@ export default function Login() {
                     type={showPassword ? 'text' : 'password'}
                     autoComplete="current-password"
                     value={password}
-                    disabled={loading}
+                    disabled={busy}
                     onChange={(e) => {
                       setPassword(e.target.value);
                       setError('');
@@ -358,7 +446,7 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    disabled={loading}
+                    disabled={busy}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                     className="absolute right-1 top-1 h-9 w-9 inline-flex items-center justify-center rounded text-ink-2 transition-colors hover:text-ink hover:bg-paper active:scale-95 disabled:pointer-events-none"
                   >
@@ -369,7 +457,7 @@ export default function Login() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={busy}
                 aria-busy={loading}
                 className="relative h-11 w-full overflow-hidden rounded-md bg-board text-sm font-medium text-paper transition-colors duration-150 hover:bg-board-600 active:bg-board-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
@@ -413,7 +501,7 @@ export default function Login() {
                 <GoogleSignInButton
                   onSuccess={handleGoogleSuccess}
                   onError={handleGoogleError}
-                  disabled={loading}
+                  disabled={busy}
                   scriptFailed={googleScriptFailed}
                 />
               </>

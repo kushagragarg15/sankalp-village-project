@@ -27,7 +27,7 @@ const volunteerLinks = [
 ];
 
 export default function Sidebar({ onNavigate, liveCount = 0 }) {
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isAdmin, isDemo, logout } = useAuth();
   const links = isAdmin ? adminLinks : volunteerLinks;
 
   return (
@@ -99,6 +99,7 @@ export default function Sidebar({ onNavigate, liveCount = 0 }) {
         <p className="text-sm font-medium text-paper truncate">{user?.name}</p>
         <p className="text-[12px] text-board-400 truncate">
           {isAdmin ? 'Coordinator' : 'Volunteer'}
+          {isDemo && ' · Demo account'}
         </p>
         <button
           type="button"

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import api from '../utils/api';
+import api, { authAPI } from '../utils/api';
 
 const AuthContext = createContext(null);
 
@@ -58,6 +58,23 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // role: 'volunteer' | 'coordinator'
+  const demoLogin = async (role) => {
+    try {
+      const response = await authAPI.demoLogin(role);
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
+      }
+      setUser(response.data.data);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'The demo could not be opened'
+      };
+    }
+  };
+
   const logout = async () => {
     try {
       await api.post('/auth/logout');
@@ -74,8 +91,10 @@ export const AuthProvider = ({ children }) => {
     user,
     loading,
     login,
+    demoLogin,
     logout,
     isAdmin: user?.role === 'admin',
+    isDemo: Boolean(user?.isDemo),
     isVolunteer: user?.role === 'volunteer'
   };
 
