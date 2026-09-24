@@ -101,13 +101,22 @@ export default function Sidebar({ onNavigate, liveCount = 0 }) {
           {isAdmin ? 'Coordinator' : 'Volunteer'}
           {isDemo && ' · Demo account'}
         </p>
-        <button
-          type="button"
-          onClick={logout}
-          className="mt-3 text-[13px] text-board-400 hover:text-paper underline underline-offset-4 decoration-board-500 hover:decoration-paper transition-colors"
-        >
-          Sign out
-        </button>
+        <div className="mt-3 flex items-center gap-4">
+          <button
+            type="button"
+            onClick={logout}
+            className="text-[13px] text-board-400 hover:text-paper underline underline-offset-4 decoration-board-500 hover:decoration-paper transition-colors"
+          >
+            Sign out
+          </button>
+          <NavLink
+            to="/village"
+            onClick={onNavigate}
+            className="text-[13px] text-board-400 hover:text-paper underline underline-offset-4 decoration-board-500 hover:decoration-paper transition-colors"
+          >
+            The village
+          </NavLink>
+        </div>
       </div>
     </div>
   );

@@ -4,6 +4,8 @@ import axios from 'axios';
 // production rewrite) forward /api — that avoids the CORS preflight entirely.
 const API_URL = import.meta.env.VITE_API_URL;
 
+const PUBLIC_PATHS = ['/login', '/village'];
+
 const api = axios.create({
   baseURL: API_URL ? `${API_URL}/api` : '/api',
   withCredentials: true,
@@ -30,8 +32,10 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Only redirect to login if we're not already on the login page
-    if (error.response?.status === 401 && window.location.pathname !== '/login') {
+    // Only redirect to login from a page that needs it — not from the login
+    // page itself, and not from public pages, where AuthProvider's /auth/me
+    // check 401s for every signed-out visitor.
+    if (error.response?.status === 401 && !PUBLIC_PATHS.includes(window.location.pathname)) {
       localStorage.removeItem('token');
       window.location.href = '/login';
     }

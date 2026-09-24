@@ -125,6 +125,12 @@ export default {
           '50%': { transform: 'translateX(100%) scaleX(1.15)' },
           '100%': { transform: 'translateX(300%) scaleX(0.7)' },
         },
+        // The village page's photo strip: the track holds the set twice, so
+        // moving it by half its width loops seamlessly.
+        marquee: {
+          from: { transform: 'translateX(0)' },
+          to: { transform: 'translateX(-50%)' },
+        },
       },
       animation: {
         'rule-pulse': 'rule-pulse 1.6s ease-in-out infinite',
@@ -136,6 +142,7 @@ export default {
         'work-fill': 'work-fill 5.5s linear both',
         'work-dot': 'work-dot 1.05s ease-in-out infinite',
         'rule-sweep': 'rule-sweep 1.4s cubic-bezier(0.65, 0, 0.35, 1) infinite',
+        marquee: 'marquee 70s linear infinite',
       },
     },
   },

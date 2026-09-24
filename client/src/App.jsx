@@ -24,6 +24,7 @@ const SessionPrep = lazy(() => import('./pages/SessionPrep'));
 const AIActivity = lazy(() => import('./pages/AIActivity'));
 const AdminSessions = lazy(() => import('./pages/AdminSessions'));
 const AttendanceReport = lazy(() => import('./pages/AttendanceReport'));
+const VillageProject = lazy(() => import('./pages/VillageProject'));
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user, loading } = useAuth();
@@ -74,6 +75,7 @@ function App() {
             >
               <Routes>
                 <Route path="/login" element={<Login />} />
+                <Route path="/village" element={<VillageProject />} />
 
                 {routes.map(({ path, element, adminOnly }) => (
                   <Route
