@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import PhotoFan from '../components/PhotoFan';
+import { LOGIN_PRINTS } from '../data/villagePhotos';
 import { GoogleOAuthProvider, GoogleLogin, useGoogleOAuth } from '@react-oauth/google';
 import DotGrid from '../components/DotGrid';
 import logoImage from '../assets/sankalp-logo.jpg';
@@ -255,6 +257,18 @@ export default function Login() {
             <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold-bright animate-rule-pulse" />
             Recorded on site, inside the session window.
           </div>
+
+          <Link
+            to="/village"
+            aria-label="See the village project"
+            className="group relative mt-6 flex w-fit items-end gap-4 animate-rise-in"
+            style={{ animationDelay: '260ms' }}
+          >
+            <PhotoFan photos={LOGIN_PRINTS} className="h-[112px]" />
+            <span className="pb-1 text-[12px] text-board-400 transition-colors group-hover:text-paper">
+              See the village <span aria-hidden="true">&rarr;</span>
+            </span>
+          </Link>
         </div>
 
         {/* The blackboard side states what the register is for. */}
@@ -284,6 +298,22 @@ export default function Login() {
             <span className="type-title text-[16px] text-paper">Sankalp Club</span>
           </div>
 
+          <div className="relative">
+          {/* Prints from the village, pinned to the board: the register is
+              for these afternoons, so the first screen should show one. */}
+          <Link
+            to="/village"
+            aria-label="See the village project"
+            className="group mb-10 block w-fit animate-rise-in rounded-md xl:mb-12"
+            style={{ animationDelay: '60ms' }}
+          >
+            <PhotoFan photos={LOGIN_PRINTS} className="h-[clamp(170px,27vh,290px)]" />
+            <span className="mt-8 inline-flex items-center gap-1.5 text-[13px] text-board-400 transition-colors group-hover:text-paper">
+              From our weekend sessions
+              <span aria-hidden="true" className="transition-transform group-hover:translate-x-0.5">&rarr;</span>
+            </span>
+          </Link>
+
           {/* The register mark: a tick and a ruled line, the same grammar the
               rest of the app uses to say "this entry, on this date" — placed
               here as if the page itself is the first line in the book. */}
@@ -303,7 +333,7 @@ export default function Login() {
 
             <div>
               <p
-                className="type-display max-w-[13ch] text-[clamp(2.6rem,4.4vw,4rem)] text-paper animate-rise-in"
+                className="type-display max-w-[13ch] text-[clamp(2.4rem,3.9vw,3.6rem)] text-paper animate-rise-in"
                 style={{ animationDelay: '160ms' }}
               >
                 Every lesson, on the record.
@@ -316,6 +346,7 @@ export default function Login() {
                 code goes out, and what each child was taught gets written down.
               </p>
             </div>
+          </div>
           </div>
 
           <div
