@@ -83,7 +83,9 @@ exports.protect = async (req, res, next) => {
       });
     }
 
-    req.user = user;
+    // Copy rather than mutate: `user` is the cached object shared with the
+    // account's non-demo sessions.
+    req.user = decoded.demo ? { ...user, isDemo: true } : user;
     next();
   } catch (error) {
     next(error);
@@ -101,6 +103,18 @@ exports.authorize = (...roles) => {
     }
     next();
   };
+};
+
+// A demo session is shared by everyone who clicks the button, so it may look
+// at a page but not change who has an account or what they can do.
+exports.blockDemoWrites = (req, res, next) => {
+  if (req.user?.isDemo && req.method !== 'GET' && req.method !== 'HEAD') {
+    return res.status(403).json({
+      success: false,
+      message: 'The demo account can view volunteers but not add, edit or remove them.'
+    });
+  }
+  next();
 };
 
 exports.invalidateUser = invalidateUser;

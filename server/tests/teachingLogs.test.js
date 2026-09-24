@@ -16,7 +16,8 @@ jest.mock('../middleware/auth', () => ({
     req.user = { id: VOLUNTEER_ID, _id: VOLUNTEER_ID, role: 'volunteer', name: 'Asha' };
     next();
   },
-  authorize: () => (req, res, next) => next()
+  authorize: () => (req, res, next) => next(),
+  blockDemoWrites: (req, res, next) => next()
 }));
 
 const createApp = require('../app');

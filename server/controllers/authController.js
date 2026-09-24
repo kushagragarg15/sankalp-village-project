@@ -29,6 +29,19 @@ const publicUser = (user) => ({
 
 const generateToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
 
+// One-click demo sign-in for people looking at the project (recruiters,
+// reviewers). Each demo role maps to an existing account named in the env;
+// unset means that button is off. The account's role is checked, never set:
+// a misconfigured email cannot turn anyone into a coordinator, and a super
+// admin is never handed out.
+const DEMO_ACCOUNTS = {
+  volunteer: { env: 'DEMO_VOLUNTEER_EMAIL', role: 'volunteer' },
+  coordinator: { env: 'DEMO_COORDINATOR_EMAIL', role: 'admin' }
+};
+const DEMO_SESSION_MS = 4 * 60 * 60 * 1000;
+
+const demoEmail = (kind) => (process.env[DEMO_ACCOUNTS[kind].env] || '').toLowerCase().trim();
+
 // @desc    Login user
 // @route   POST /api/auth/login
 // @access  Public
@@ -62,6 +75,50 @@ exports.login = async (req, res, next) => {
       token,
       data: publicUser(user)
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Which demo sign-ins are available
+// @route   GET /api/auth/demo
+// @access  Public
+exports.getDemoOptions = (req, res) => {
+  res.status(200).json({
+    success: true,
+    data: { volunteer: Boolean(demoEmail('volunteer')), coordinator: Boolean(demoEmail('coordinator')) }
+  });
+};
+
+// @desc    Sign in as the demo volunteer or coordinator
+// @route   POST /api/auth/demo
+// @access  Public
+exports.demoLogin = async (req, res, next) => {
+  try {
+    const kind = req.body?.role;
+    if (!Object.prototype.hasOwnProperty.call(DEMO_ACCOUNTS, kind)) {
+      return res.status(400).json({ success: false, message: "Demo role must be 'volunteer' or 'coordinator'." });
+    }
+
+    const email = demoEmail(kind);
+    if (!email) {
+      return res.status(404).json({ success: false, message: 'The demo is not enabled on this server.' });
+    }
+
+    const db = getDb();
+    const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+
+    if (!user || user.role !== DEMO_ACCOUNTS[kind].role || user.isSuperAdmin) {
+      return res.status(503).json({ success: false, message: 'The demo account is not set up correctly. Try again later.' });
+    }
+
+    // `demo` in the token is what lets protect() mark the session, so
+    // account-management routes can refuse it (see blockDemoWrites).
+    const token = jwt.sign({ id: user.id, demo: true }, process.env.JWT_SECRET, { expiresIn: DEMO_SESSION_MS / 1000 });
+
+    res.cookie('token', token, { ...cookieOptions(), maxAge: DEMO_SESSION_MS });
+
+    res.status(200).json({ success: true, token, data: { ...publicUser(user), isDemo: true } });
   } catch (error) {
     next(error);
   }
