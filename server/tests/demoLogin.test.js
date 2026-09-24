@@ -37,15 +37,15 @@ afterAll(() => {
   delete process.env.DEMO_COORDINATOR_EMAIL;
 });
 
-describe('GET /api/auth/demo', () => {
-  test('reports which demo roles are configured', async () => {
-    delete process.env.DEMO_COORDINATOR_EMAIL;
-    const res = await request(app).get('/api/auth/demo');
-    expect(res.body.data).toEqual({ volunteer: true, coordinator: false });
-  });
-});
-
 describe('POST /api/auth/demo', () => {
+  test('falls back to the seeded account when no env var is set', async () => {
+    delete process.env.DEMO_VOLUNTEER_EMAIL;
+    mockDb.queueSelect([{ ...VOLUNTEER, email: '23ucc501@lnmiit.ac.in' }]);
+    const res = await request(app).post('/api/auth/demo').send({ role: 'volunteer' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.isDemo).toBe(true);
+  });
+
   test('400 for an unknown role, without touching the database', async () => {
     mockDb.select.mockClear();
     const res = await request(app).post('/api/auth/demo').send({ role: 'admin' });
@@ -53,8 +53,8 @@ describe('POST /api/auth/demo', () => {
     expect(mockDb.select).not.toHaveBeenCalled();
   });
 
-  test('404 when that demo is not configured', async () => {
-    delete process.env.DEMO_VOLUNTEER_EMAIL;
+  test('404 when that demo is switched off with an empty env var', async () => {
+    process.env.DEMO_VOLUNTEER_EMAIL = '';
     const res = await request(app).post('/api/auth/demo').send({ role: 'volunteer' });
     expect(res.status).toBe(404);
   });

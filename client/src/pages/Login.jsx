@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { authAPI } from '../utils/api';
 import { GoogleOAuthProvider, GoogleLogin, useGoogleOAuth } from '@react-oauth/google';
 import DotGrid from '../components/DotGrid';
 import logoImage from '../assets/sankalp-logo.jpg';
@@ -156,27 +155,12 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleScriptFailed, setGoogleScriptFailed] = useState(false);
-  const [demoOptions, setDemoOptions] = useState({ volunteer: false, coordinator: false });
   const [demoRole, setDemoRole] = useState(null);
   const { login, demoLogin } = useAuth();
   const navigate = useNavigate();
 
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
   const busy = loading || demoRole !== null;
-  const demoAvailable = demoOptions.volunteer || demoOptions.coordinator;
-
-  // The server decides which demo accounts exist; the panel only appears
-  // when at least one is configured.
-  useEffect(() => {
-    let cancelled = false;
-    authAPI
-      .demoOptions()
-      .then((res) => !cancelled && setDemoOptions(res.data.data))
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const handleDemo = async (role) => {
     setError('');
@@ -353,36 +337,22 @@ export default function Login() {
               Use the account your coordinator set up for you.
             </p>
 
-            {demoAvailable && (
-              <section aria-labelledby="demo-heading" className="mt-7 rounded-md border border-rule bg-surface p-4">
-                <h2 id="demo-heading" className="type-title text-[14px] text-ink">
-                  Just looking around?
-                </h2>
-                <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
-                  Open the app with sample data — no account needed.
-                </p>
-                <div className="mt-3.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {demoOptions.volunteer && (
-                    <DemoButton
-                      label="Demo as volunteer"
-                      detail="Register, log a lesson, ask the AI"
-                      pending={demoRole === 'volunteer'}
-                      disabled={busy}
-                      onClick={() => handleDemo('volunteer')}
-                    />
-                  )}
-                  {demoOptions.coordinator && (
-                    <DemoButton
-                      label="Demo as coordinator"
-                      detail="Run sessions, analytics, AI activity"
-                      pending={demoRole === 'coordinator'}
-                      disabled={busy}
-                      onClick={() => handleDemo('coordinator')}
-                    />
-                  )}
-                </div>
-              </section>
-            )}
+            <div className="mt-7 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <DemoButton
+                label="Demo as volunteer"
+                detail="One click, sample data"
+                pending={demoRole === 'volunteer'}
+                disabled={busy}
+                onClick={() => handleDemo('volunteer')}
+              />
+              <DemoButton
+                label="Demo as coordinator"
+                detail="One click, sample data"
+                pending={demoRole === 'coordinator'}
+                disabled={busy}
+                onClick={() => handleDemo('coordinator')}
+              />
+            </div>
 
             {error && (
               <div
@@ -394,15 +364,13 @@ export default function Login() {
               </div>
             )}
 
-            {demoAvailable && (
-              <div className="mt-7 flex items-center gap-3">
-                <span className="h-px flex-1 bg-rule" />
-                <span className="text-[13px] text-ink-3">or sign in with your account</span>
-                <span className="h-px flex-1 bg-rule" />
-              </div>
-            )}
+            <div className="mt-6 flex items-center gap-3">
+              <span className="h-px flex-1 bg-rule" />
+              <span className="text-[13px] text-ink-3">or sign in with your account</span>
+              <span className="h-px flex-1 bg-rule" />
+            </div>
 
-            <form onSubmit={handleSubmit} className={`${demoAvailable ? 'mt-5' : 'mt-7'} space-y-4`} noValidate>
+            <form onSubmit={handleSubmit} className="mt-5 space-y-4" noValidate>
               <div>
                 <label htmlFor="email" className="block text-[13px] font-medium text-ink mb-1.5">
                   Email

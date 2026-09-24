@@ -80,7 +80,7 @@ The Vite dev server proxies `/api` -> `http://localhost:5000`, so the client wor
 
 - `protect` — requires a valid token, loads `req.user`.
 - `authorize(...roles)` — role gate, used as `protect, authorize('admin')`. Roles are `'admin'` and `'volunteer'` on the `User` model.
-- **Demo sign-in** — `GET/POST /api/auth/demo` (`{ role: 'volunteer' | 'coordinator' }`) signs into the existing account named by `DEMO_VOLUNTEER_EMAIL` / `DEMO_COORDINATOR_EMAIL`, after checking its role matches (503 otherwise — never promotes; super admins refused). The 4h JWT carries `demo: true`; `protect` copies it onto `req.user.isDemo` (copy, not mutate — the user cache is shared), and `blockDemoWrites` on `routes/users.js` rejects non-GET requests from demo sessions. Login page shows the buttons only for configured roles.
+- **Demo sign-in** — `POST /api/auth/demo` (`{ role: 'volunteer' | 'coordinator' }`) signs into the existing account named by `DEMO_VOLUNTEER_EMAIL` / `DEMO_COORDINATOR_EMAIL` (default: seeded `23ucc501` / `22ucc430`; empty string disables), after checking its role matches (503 otherwise — never promotes; super admins refused). The 4h JWT carries `demo: true`; `protect` copies it onto `req.user.isDemo` (copy, not mutate — the user cache is shared), and `blockDemoWrites` on `routes/users.js` rejects non-GET requests from demo sessions. The login page always shows both buttons.
 
 ### Attendance system (the core domain) — `AttendanceSession` → `Registration` → `TeachingLog`
 

@@ -30,17 +30,20 @@ const publicUser = (user) => ({
 const generateToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
 
 // One-click demo sign-in for people looking at the project (recruiters,
-// reviewers). Each demo role maps to an existing account named in the env;
-// unset means that button is off. The account's role is checked, never set:
-// a misconfigured email cannot turn anyone into a coordinator, and a super
-// admin is never handed out.
+// reviewers). Each demo role maps to an existing seeded account; the env var
+// overrides it, and setting it to an empty string turns that demo off. The
+// account's role is checked, never set: a misconfigured email cannot turn
+// anyone into a coordinator, and a super admin is never handed out.
 const DEMO_ACCOUNTS = {
-  volunteer: { env: 'DEMO_VOLUNTEER_EMAIL', role: 'volunteer' },
-  coordinator: { env: 'DEMO_COORDINATOR_EMAIL', role: 'admin' }
+  volunteer: { env: 'DEMO_VOLUNTEER_EMAIL', fallback: '23ucc501@lnmiit.ac.in', role: 'volunteer' },
+  coordinator: { env: 'DEMO_COORDINATOR_EMAIL', fallback: '22ucc430@lnmiit.ac.in', role: 'admin' }
 };
 const DEMO_SESSION_MS = 4 * 60 * 60 * 1000;
 
-const demoEmail = (kind) => (process.env[DEMO_ACCOUNTS[kind].env] || '').toLowerCase().trim();
+const demoEmail = (kind) => {
+  const { env, fallback } = DEMO_ACCOUNTS[kind];
+  return (process.env[env] ?? fallback).toLowerCase().trim();
+};
 
 // @desc    Login user
 // @route   POST /api/auth/login
@@ -78,16 +81,6 @@ exports.login = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
-};
-
-// @desc    Which demo sign-ins are available
-// @route   GET /api/auth/demo
-// @access  Public
-exports.getDemoOptions = (req, res) => {
-  res.status(200).json({
-    success: true,
-    data: { volunteer: Boolean(demoEmail('volunteer')), coordinator: Boolean(demoEmail('coordinator')) }
-  });
 };
 
 // @desc    Sign in as the demo volunteer or coordinator
