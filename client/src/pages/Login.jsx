@@ -4,6 +4,13 @@ import { useAuth } from '../context/AuthContext';
 import { GoogleOAuthProvider, GoogleLogin, useGoogleOAuth } from '@react-oauth/google';
 import PhotoWall from '../components/PhotoWall';
 import ParticleText from '../components/ParticleText';
+import GooeyNav from '../components/GooeyNav';
+
+// Only pages a signed-out visitor can actually open.
+const NAV_ITEMS = [
+  { label: 'Sign in', href: '/login' },
+  { label: 'The village', href: '/village' },
+];
 
 function EyeIcon({ crossed }) {
   return (
@@ -188,6 +195,7 @@ export default function Login() {
         {/* One flat dim, nothing graded: the photos stay sharp, the type stays readable. */}
         <div aria-hidden="true" className="pointer-events-none fixed inset-0 bg-board/80" />
 
+
         <div className="relative mx-auto flex min-h-screen w-full max-w-[1400px] flex-col justify-center gap-10 px-5 py-10 sm:px-8 lg:flex-row lg:items-center lg:justify-between lg:gap-16 lg:px-12 xl:px-16">
           <div>
             <h1 className="select-none leading-[0.9] tracking-[-0.04em]">
@@ -210,7 +218,7 @@ export default function Login() {
                 glow
               />
             </h1>
-            <p className="mt-4 text-[clamp(1.05rem,1.8vw,1.5rem)] font-medium leading-snug text-paper/85 lg:mt-6">
+            <p className="mt-3 font-serif text-[clamp(1.35rem,2.4vw,2.1rem)] font-normal italic leading-snug tracking-[-0.005em] text-paper/90 lg:mt-5">
               Every hour of good, on the record.
             </p>
           </div>
@@ -324,6 +332,21 @@ export default function Login() {
             </div>
           </main>
         </div>
+        {/* After the content so it paints on top; no z-index, which would
+            isolate it and break the gooey blend against the photos. */}
+        <header className="absolute inset-x-0 top-0 flex justify-center px-5 pt-6 text-[14px] font-medium sm:pt-8">
+          <GooeyNav
+            items={NAV_ITEMS}
+            particleCount={15}
+            particleDistances={[90, 10]}
+            particleR={100}
+            initialActiveIndex={0}
+            animationTime={600}
+            timeVariance={300}
+            colors={[1, 2, 3, 1, 2, 3, 1, 4]}
+            onNavigate={(item) => navigate(item.href)}
+          />
+        </header>
       </div>
     </GoogleOAuthProvider>
   );

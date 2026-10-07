@@ -5,6 +5,7 @@ import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import Button from '../components/Button';
 import Prose from '../components/Prose';
+import ThoughtLine from '../components/ThoughtLine';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
@@ -195,6 +196,11 @@ export default function AskSaakshi() {
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const endRef = useRef(null);
+  // How long the agent thought before answering, from the live ThoughtLine;
+  // kept with the answer so it still reads "Thought for 4s" afterwards.
+  const thoughtRef = useRef(null);
+  // Set just before this page puts a new conversation's id in the URL.
+  const createdHereRef = useRef(null);
   const inputRef = useRef(null);
 
   const prompts = isAdmin ? ADMIN_PROMPTS : VOLUNTEER_PROMPTS;
@@ -217,6 +223,13 @@ export default function AskSaakshi() {
   useEffect(() => {
     if (!conversationId) {
       setMessages([]);
+      return undefined;
+    }
+    // We just started this conversation and already hold its messages
+    // (including what only lives client-side, like how long it thought);
+    // re-reading it from the server would replace them.
+    if (createdHereRef.current === conversationId) {
+      createdHereRef.current = null;
       return undefined;
     }
     let cancelled = false;
@@ -277,6 +290,7 @@ export default function AskSaakshi() {
     setError('');
     setLoading(true);
     setLive({ text: '', status: 'Thinking', steps: [] });
+    thoughtRef.current = null;
 
     try {
       // Only the new question goes up. The server owns the transcript and
@@ -313,6 +327,7 @@ export default function AskSaakshi() {
           role: 'assistant',
           content: result.answer,
           status: result.status,
+          thought: thoughtRef.current,
           trace: {
             steps: result.steps || [],
             iterations: result.iterations,
@@ -325,6 +340,7 @@ export default function AskSaakshi() {
       // First answer of a new conversation: pin its id to the URL so a
       // refresh restores it, and show it in the history list.
       if (result.conversationId && result.conversationId !== conversationId) {
+        createdHereRef.current = result.conversationId;
         setSearchParams({ c: result.conversationId }, { replace: true });
       }
       loadHistory();
@@ -415,6 +431,19 @@ export default function AskSaakshi() {
               ) : (
                 <li key={i} className="animate-lift-in">
                   <article className={`rounded-lg border bg-surface px-4 py-3.5 ${m.status === 'error' ? 'border-brick-line' : 'border-rule'}`}>
+                    {m.thought && (
+                      <ThoughtLine
+                        working={false}
+                        seconds={m.thought.seconds}
+                        steps={m.thought.steps}
+                        doneLabel="Thought for"
+                        glyph="sparkle"
+                        fontSize={13}
+                        collapsible
+                        collapseOnSettle
+                        className="mb-2.5"
+                      />
+                    )}
                     <Prose text={m.content} />
                     {m.trace && <Trace {...m.trace} />}
                   </article>
@@ -425,23 +454,31 @@ export default function AskSaakshi() {
             {loading && (
               <li>
                 <div className="rounded-lg border border-rule bg-surface px-4 py-3.5">
-                  {live.text ? (
-                    <div>
+                  {/* Thinking until the answer starts streaming; the steps are
+                      the lookups the agent is actually making. */}
+                  <ThoughtLine
+                    working={!live.text}
+                    steps={live.steps.map((tool) => TOOL_LABELS[tool] || tool)}
+                    label="Thinking…"
+                    doneLabel="Thought for"
+                    glyph="sparkle"
+                    fontSize={13}
+                    breathPeriod={1.6}
+                    breathDepth={0.45}
+                    settleDuration={350}
+                    settleBlur={2}
+                    collapsible
+                    collapseOnSettle
+                    showTimer
+                    onSettle={(seconds) => {
+                      thoughtRef.current = { seconds, steps: live.steps.map((tool) => TOOL_LABELS[tool] || tool) };
+                    }}
+                  />
+                  {live.text && (
+                    <div className="mt-2.5">
                       <Prose text={live.text} />
                       <span aria-hidden="true" className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[2px] bg-board animate-rule-pulse" />
                     </div>
-                  ) : (
-                    <>
-                      <div className="h-[3px] w-28 overflow-hidden rounded-full bg-rule">
-                        <div className="h-full w-1/3 rounded-full bg-board animate-rule-pulse" />
-                      </div>
-                      <p className="mt-2.5 text-[13px] text-ink-2" aria-live="polite">
-                        {live.status || 'Looking through the club\'s records'}
-                        {live.steps.length > 0 && (
-                          <span className="text-ink-3"> · {live.steps.length} {live.steps.length === 1 ? 'lookup' : 'lookups'} so far</span>
-                        )}
-                      </p>
-                    </>
                   )}
                 </div>
               </li>

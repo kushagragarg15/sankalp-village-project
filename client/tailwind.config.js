@@ -9,6 +9,8 @@ export default {
       fontFamily: {
         sans: ['Archivo', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+        // Italic only, for the login tagline.
+        serif: ['Newsreader', 'Georgia', 'serif'],
       },
       colors: {
         // The blackboard. Only the nav rail and the live module are inverted.
@@ -141,6 +143,21 @@ export default {
           from: { transform: 'translateY(-50%)' },
           to: { transform: 'translateY(0)' },
         },
+        // ThoughtLine: a new line of thought comes into focus; while working,
+        // the line breathes; the sparkle turns slowly.
+        'thought-in': {
+          from: { opacity: '0', filter: 'blur(var(--settle-blur, 2px))' },
+          to: { opacity: '1', filter: 'blur(0)' },
+        },
+        'thought-breathe': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: 'var(--breath-min, 0.55)' },
+        },
+        'thought-spin': {
+          from: { transform: 'rotate(0deg) scale(1)' },
+          '50%': { transform: 'rotate(90deg) scale(0.82)' },
+          to: { transform: 'rotate(180deg) scale(1)' },
+        },
       },
       animation: {
         'rule-pulse': 'rule-pulse 1.6s ease-in-out infinite',
@@ -156,6 +173,10 @@ export default {
         // Per-column speed is set inline with animation-duration.
         'wall-up': 'wall-up 80s linear infinite',
         'wall-down': 'wall-down 80s linear infinite',
+        'thought-spin': 'thought-spin 2.4s ease-in-out infinite',
+        // Durations are overridden inline from ThoughtLine's props.
+        'thought-in': 'thought-in 350ms ease-out both',
+        'thought-breathe': 'thought-breathe 1.6s ease-in-out infinite',
       },
     },
   },

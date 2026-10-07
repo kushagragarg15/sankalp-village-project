@@ -798,7 +798,7 @@ flowchart TD
 - Login, Today, Sessions and Attendance are in the main bundle; every other page is `lazy()`-loaded so first paint does not carry Recharts or the admin screens.
 - `utils/api.js` is the single axios instance (Bearer token from `localStorage`, cookie fallback, 401 → `/login`). `aiAPI.askStream` uses `fetch` to read the SSE body and parses `token` / `retract` / `tool_start` / `tool_end` / `done` / `error` events.
 - With no `VITE_API_URL`, the app stays same-origin and the Vite dev proxy forwards `/api` to `:5000`, avoiding CORS preflights entirely.
-- Components: `Layout`, `Sidebar`, `Spine`, `PageHeader`, `StatStrip`, `SessionRow`, `LiveCode`, `Table`, `Modal`, `Prose` (renders model output), `Chart`, `ParticleText` (the login wordmark: particles that gather into "Saakshi" and part around the pointer), `PhotoWall` (the login background: every session photo in tilted columns drifting up and down), `Badge`, `Button`, `Card`, `Input`, `EmptyState`, `LoadingState`.
+- Components: `Layout`, `Sidebar`, `Spine`, `PageHeader`, `StatStrip`, `SessionRow`, `LiveCode`, `Table`, `Modal`, `Prose` (renders model output), `Chart`, `ParticleText` (the login wordmark: particles that gather into "Saakshi" and part around the pointer), `GooeyNav` (the login page nav), `ThoughtLine` (the Ask page's live "Thinking… / Thought for Ns" line, built from the lookups the agent actually makes), `PhotoWall` (the login background: every session photo in tilted columns drifting up and down), `Badge`, `Button`, `Card`, `Input`, `EmptyState`, `LoadingState`.
 
 ---
 
