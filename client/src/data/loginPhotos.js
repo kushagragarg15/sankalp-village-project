@@ -1,7 +1,6 @@
-// Photos from the club's weekend sessions, drawn as the pixel wall behind the
-// login page — one per visit. Landscape only: a portrait photo cropped to a
-// wide screen zooms into a single face. Kept at 640px: the wall only samples ~100 cells
-// across, so the full-size originals never need to be public.
+// Photos from the club's weekend sessions, shown with the village photos on
+// the login page's moving photo wall. Kept at 640px: wall tiles are small, so
+// the full-size originals never need to be public.
 import laughingKids from '../assets/login/laughing-kids.webp';
 import bigGroup from '../assets/login/big-group.webp';
 import brickWallGroup from '../assets/login/brick-wall-group.webp';
