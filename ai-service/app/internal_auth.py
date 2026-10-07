@@ -26,9 +26,9 @@ class InternalUser:
 
 def require_internal_auth(
     authorization: Annotated[str | None, Header()] = None,
-    x_sankalp_user_id: Annotated[str | None, Header()] = None,
-    x_sankalp_user_role: Annotated[str | None, Header()] = None,
-    x_sankalp_user_name: Annotated[str | None, Header()] = None,
+    x_saakshi_user_id: Annotated[str | None, Header()] = None,
+    x_saakshi_user_role: Annotated[str | None, Header()] = None,
+    x_saakshi_user_name: Annotated[str | None, Header()] = None,
     settings: Settings = Depends(get_settings),
 ) -> InternalUser:
     """
@@ -38,7 +38,7 @@ def require_internal_auth(
     only Node calls it, over the shared `AI_SERVICE_TOKEN` secret, and Node
     is the one that resolved `req.user` (with its role cache/invalidation)
     before making the call. A caller who only has the browser's JWT, or who
-    forges an X-Sankalp-User-* header without the shared secret, gets 401.
+    forges an X-Saakshi-User-* header without the shared secret, gets 401.
     """
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing internal service credentials")
@@ -47,10 +47,10 @@ def require_internal_auth(
     if not secrets.compare_digest(token, settings.ai_service_token):
         raise HTTPException(status_code=401, detail="Invalid internal service credentials")
 
-    if not x_sankalp_user_id or not x_sankalp_user_role or not x_sankalp_user_name:
+    if not x_saakshi_user_id or not x_saakshi_user_role or not x_saakshi_user_name:
         raise HTTPException(status_code=400, detail="Missing user context headers")
 
-    if x_sankalp_user_role not in ROLES:
+    if x_saakshi_user_role not in ROLES:
         raise HTTPException(status_code=400, detail=f"role must be one of: {', '.join(ROLES)}")
 
-    return InternalUser(id=x_sankalp_user_id, role=x_sankalp_user_role, name=unquote(x_sankalp_user_name))
+    return InternalUser(id=x_saakshi_user_id, role=x_saakshi_user_role, name=unquote(x_saakshi_user_name))

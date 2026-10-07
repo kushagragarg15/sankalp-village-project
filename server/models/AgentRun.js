@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-// One row per question put to the "Ask Sankalp" agent. Stores the full trace —
+// One row per question put to the "Ask Saakshi" agent. Stores the full trace —
 // every tool the model chose, with what arguments, how long it took and whether
 // it worked — so a run can be audited or replayed after the fact. This is what
 // lets an admin answer "why did it say that?" instead of guessing.

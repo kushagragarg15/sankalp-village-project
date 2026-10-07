@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import logoImage from '../assets/sankalp-logo.jpg';
+import logoImage from '../assets/saakshi-mark.svg';
 
 // Named for what a volunteer or coordinator would call them, not for the
 // tables underneath.
@@ -37,11 +37,11 @@ export default function Sidebar({ onNavigate, liveCount = 0 }) {
           <img
             src={logoImage}
             alt=""
-            className="h-8 w-8 rounded object-cover shrink-0"
+            className="h-8 w-8 rounded shrink-0"
           />
           <div className="min-w-0">
-            <p className="type-title text-[15px] text-paper truncate">Sankalp Club</p>
-            <p className="text-[12px] text-board-400 truncate">Teaching register</p>
+            <p className="type-title text-[15px] text-paper truncate">Saakshi</p>
+            <p className="text-[12px] text-board-400 truncate">Sankalp Club</p>
           </div>
         </div>
         <button

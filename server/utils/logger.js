@@ -11,7 +11,7 @@ const destination = process.env.LOG_DESTINATION === 'stderr' ? 2 : 1;
 
 const options = {
   level,
-  base: { service: 'sankalp-api' },
+  base: { service: 'saakshi-api' },
   timestamp: pino.stdTimeFunctions.isoTime,
   // Never let a secret reach the log line, whatever object gets passed in.
   redact: {

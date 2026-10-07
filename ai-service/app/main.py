@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
         await app.state.pool.close()
 
 
-app = FastAPI(title="Sankalp AI Service", lifespan=lifespan)
+app = FastAPI(title="Saakshi AI Service", lifespan=lifespan)
 app.include_router(rag_router)
 app.include_router(agent_router)
 
@@ -73,6 +73,6 @@ async def whoami(user: InternalUser = Depends(require_internal_auth)):
     """
     Smallest possible proof the Node -> Python auth hop works: echoes back
     the trusted user context Node sent, same idea as the MCP server's
-    `sankalp://whoami` resource.
+    `saakshi://whoami` resource.
     """
     return {"id": user.id, "role": user.role, "name": user.name}

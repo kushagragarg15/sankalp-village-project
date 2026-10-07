@@ -5,7 +5,7 @@ global:
   scrape_interval: 15s
 
 scrape_configs:
-  - job_name: sankalp-api
+  - job_name: saakshi-api
     metrics_path: /metrics
     static_configs:
       - targets: ["server:5000"]

@@ -21,7 +21,7 @@ def _today_en_in() -> str:
 def build_system_prompt(user) -> str:
     who = "a coordinator (admin)" if user.role == "admin" else "a volunteer teacher"
     lines = [
-        f"You are Sankalp's assistant. Sankalp is a student club that runs weekend teaching sessions for children in a village school. You are talking to {user.name}, {who}.",
+        f"You are Saakshi, the assistant for Sankalp Club, a student club that runs weekend teaching sessions for children in a village school. You are talking to {user.name}, {who}.",
         f'Today is {_today_en_in()}. Timestamps in tool results are UTC; the club is in India (IST, UTC+5:30) — always present dates and times in IST, e.g. "Sat 12 Sep, 10:00 to 13:00".',
         "",
         "How to work:",

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Sankalp MCP server — the agent's tool registry, exposed over the Model
+ * Saakshi MCP server — the agent's tool registry, exposed over the Model
  * Context Protocol so an MCP client (Claude Desktop, Claude Code, Cursor…)
  * can ask the club's data the same questions the in-app agent can.
  *
@@ -70,7 +70,7 @@ const text = (value) => ({
 async function main() {
   const email = (process.env.MCP_USER_EMAIL || '').trim().toLowerCase();
   if (!email) {
-    console.error('MCP_USER_EMAIL is not set. The server runs as one Sankalp user and exposes that user\'s tools; refusing to start unscoped.');
+    console.error('MCP_USER_EMAIL is not set. The server runs as one Saakshi user and exposes that user\'s tools; refusing to start unscoped.');
     process.exit(1);
   }
   if (!process.env.DATABASE_URL) {
@@ -81,13 +81,13 @@ async function main() {
   const db = getDb();
   const [doc] = await db.select({ id: users.id, name: users.name, email: users.email, role: users.role }).from(users).where(eq(users.email, email)).limit(1);
   if (!doc) {
-    console.error(`No Sankalp user with email ${email}.`);
+    console.error(`No Saakshi user with email ${email}.`);
     process.exit(1);
   }
   const user = { ...doc, _id: doc.id };
   const ctx = { user };
 
-  const server = new McpServer({ name: 'sankalp', version: '1.0.0' });
+  const server = new McpServer({ name: 'saakshi', version: '1.0.0' });
 
   // ---- tools: straight from the registry, scoped to this user's role ----
   const tools = toolsForRole(user.role);
@@ -117,9 +117,9 @@ async function main() {
   // ---- one resource: who am I here, and what can I reach ----
   server.registerResource(
     'whoami',
-    'sankalp://whoami',
+    'saakshi://whoami',
     {
-      title: 'Sankalp identity',
+      title: 'Saakshi identity',
       description: 'The user this MCP server acts as, their role, and the tools that role can use.',
       mimeType: 'application/json'
     },
@@ -158,7 +158,7 @@ async function main() {
           content: {
             type: 'text',
             text:
-              `Using the Sankalp tools: list the upcoming sessions, read my teaching history, and find students needing attention${focus ? ` in ${focus}` : ''}. ` +
+              `Using the Saakshi tools: list the upcoming sessions, read my teaching history, and find students needing attention${focus ? ` in ${focus}` : ''}. ` +
               'Then tell me, briefly, which two or three groups of students I should revise with and what topic for each. ' +
               'Use only names that the tools return. Present times in IST.'
           }
@@ -169,7 +169,7 @@ async function main() {
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error(`[mcp] sankalp ready as ${user.name} (${user.role}); ${tools.length} tools: ${tools.map((t) => t.name).join(', ')}`);
+  console.error(`[mcp] saakshi ready as ${user.name} (${user.role}); ${tools.length} tools: ${tools.map((t) => t.name).join(', ')}`);
 }
 
 main().catch((err) => {

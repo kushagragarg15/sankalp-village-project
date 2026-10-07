@@ -179,7 +179,7 @@ function History({ items, activeId, onOpen, onNew, onDelete, loading }) {
   );
 }
 
-export default function AskSankalp() {
+export default function AskSaakshi() {
   const { isAdmin, user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const conversationId = searchParams.get('c');

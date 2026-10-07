@@ -3,7 +3,7 @@ const { getDb } = require('../db');
 const { retrieveContext, generateLessonPlan } = require('./ragService');
 
 /**
- * Tool registry for the "Ask Sankalp" agent.
+ * Tool registry for the "Ask Saakshi" agent.
  *
  * Each tool is a plain object:
  *   name        - what the model calls it by

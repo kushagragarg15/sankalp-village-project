@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Product name
+
+The product is **Saakshi** (Hindi: "witness"); use that name in UI copy, code identifiers, headers (`X-Saakshi-User-*`) and docs. **Sankalp Club** is the student club that is Saakshi's first organisation: its name stays only where the text is about the club itself (the `/village` story page and its logo `assets/sankalp-logo.jpg`, the agent's description of the org, seed data, the demo password). The repo folder is still `sankalps-village-project`.
+
 ## Repository layout
 
 Two independent npm packages, no workspace/monorepo tooling:
@@ -109,7 +113,7 @@ Retrieval has two modes (`RETRIEVAL_MODE`, default `vector`): `vector` ranks by 
 
 Never `new OpenAI()` or `chat.completions.create()` anywhere else. `chatWithRetry(params)` is the one chat call path (429/5xx retried with `Retry-After` / Groq's "try again in Ns" honoured; clients are built with `maxRetries: 0` so the SDK never retries silently); `getEmbeddingClient()` is the embedding client (may be a different provider); `CHAT_MODEL` / `EMBEDDING_MODEL` / `SIMILARITY_THRESHOLD` are the per-provider constants. **Embedding-space rule:** `Resource.embeddingModel` records which model produced a document's vectors; `retrieveContext` only reads resources whose `embeddingModel` matches the current `EMBEDDING_MODEL` (legacy docs with no field count as `text-embedding-3-small`), and `cosineSimilarity` returns -1 for mismatched lengths. Changing the embedding model means `npm run seed-resources` to re-embed, or retrieval silently finds nothing. Free-tier realities (2026-09): Gemini `gemini-3.5-flash` is 20 requests/day; Groq `openai/gpt-oss-120b` is ~8k tokens/minute (bursts of multi-step questions trigger 429s that the retry absorbs with `Retry-After`); the project's OpenAI account has no credits.
 
-### "Ask Sankalp" agent — `server/services/agentService.js` + `agentTools.js`
+### "Ask Saakshi" agent — `server/services/agentService.js` + `agentTools.js`
 
 `POST /api/ai/ask` with `{ conversationId?, question }` runs a **tool-using agent loop** over the club's live data (OpenAI-format function calling against whatever `llmClient` is configured for — Groq `gpt-oss-120b` in the current `.env`). **Conversation state is server-owned**: every run carries a `conversationId` (assigned on the first question, returned in the result); `runAgent` rebuilds the transcript from that user's persisted `AgentRun` rows (`loadConversation`, last 6 answered turns, errored runs skipped) and appends the new question. The client never resends history — it sends one question and pins the id in the URL (`/ask?c=<id>`) so a refresh restores the chat. `GET /api/ai/conversations` lists mine (title = first question, `turns`, `lastAt`), `GET /api/ai/conversations/:id` returns the turns with traces, `DELETE` removes mine — all owner-scoped by `userId`, so another user's id on a request yields 404 / an empty transcript, never someone else's history. The legacy `{ messages: [...] }` body is still accepted. Pre-feature runs were backfilled with one conversation each.
 
@@ -120,7 +124,7 @@ Never `new OpenAI()` or `chat.completions.create()` anywhere else. `chatWithRetr
 5. Every run is persisted to `AgentRun` (question, answer, status, per-step tool/args/duration/ok/resultPreview, token usage, `durationMs` and `llmMs` = time waiting on the model) as an audit trail. The API response returns the steps *without* `resultPreview`; the client renders them as a collapsible trace under each answer.
 6. **Streaming**: `POST /api/ai/ask/stream` is the same run as Server-Sent Events. `runAgent({ onEvent })` switches each model turn to `llmClient.chatStreamWithRetry` (`stream_options.include_usage` so tokens are still counted), reassembles tool calls from their indexed deltas in `streamTurn`, and emits `token` / `retract` (text streamed during a turn that ended in tool calls was narration — drop it) / `tool_start` / `tool_end`; the controller appends `done` (same payload as `/ask`) or `error`. The client (`aiAPI.askStream`, fetch + `ReadableStream`, since Axios cannot stream and `EventSource` cannot POST) falls back to `/ask` only on transport failure — a 4xx from a guardrail is surfaced, not retried.
 
-Tools must return small, JSON-serialisable objects — the model reads them verbatim, so shape them for a reader (names, not ObjectIds; percentages, not raw score pairs). **Shape tools around the questions people actually ask**: the first live run answered "what should I revise?" with 8 tool calls (one `get_student_progress` per child); adding a `myStudents` summary to `get_my_teaching_history` cut it to 1. Tool *descriptions* steer the model more reliably than system-prompt rules — but keep them literal; "do NOT call X for students listed by Y" made the model stop using X for a plainly named child. `AskSankalp.jsx` is the client page (`/ask`, both roles).
+Tools must return small, JSON-serialisable objects — the model reads them verbatim, so shape them for a reader (names, not ObjectIds; percentages, not raw score pairs). **Shape tools around the questions people actually ask**: the first live run answered "what should I revise?" with 8 tool calls (one `get_student_progress` per child); adding a `myStudents` summary to `get_my_teaching_history` cut it to 1. Tool *descriptions* steer the model more reliably than system-prompt rules — but keep them literal; "do NOT call X for students listed by Y" made the model stop using X for a plainly named child. `AskSaakshi.jsx` is the client page (`/ask`, both roles).
 
 ### AI guardrails — `server/middleware/aiBudget.js`
 
@@ -132,9 +136,9 @@ Admin-only. One aggregate call (`aiAdminController.getActivity`, everything in a
 
 ### MCP server — `server/mcp/server.js`
 
-The agent's tool registry exposed over the Model Context Protocol (stdio) so Claude Desktop / Claude Code / any MCP client can query club data. It is an adapter, not a second implementation: tools, descriptions, schemas (JSON Schema → zod shape via `jsonSchemaToZodShape`, strings/integers/enums only — anything else throws at startup) and role scoping all come from `agentTools.js`. Identity is `MCP_USER_EMAIL`: the server runs *as* that user, exposes only `toolsForRole(user.role)`, and refuses to start without it. Also registers one resource (`sankalp://whoami`) and one prompt (`prepare_for_next_session`). **stdout is the JSON-RPC channel** — the file redirects `console.log`/`console.info` to stderr and sets `RAG_QUIET=1` before any other require; keep it that way when adding logging anywhere the tools reach. MCP calls are logged to stderr only; they are not written to `AgentRun` and do not count against the in-app token budget (no model call happens server-side — the client's model does the reasoning).
+The agent's tool registry exposed over the Model Context Protocol (stdio) so Claude Desktop / Claude Code / any MCP client can query club data. It is an adapter, not a second implementation: tools, descriptions, schemas (JSON Schema → zod shape via `jsonSchemaToZodShape`, strings/integers/enums only — anything else throws at startup) and role scoping all come from `agentTools.js`. Identity is `MCP_USER_EMAIL`: the server runs *as* that user, exposes only `toolsForRole(user.role)`, and refuses to start without it. Also registers one resource (`saakshi://whoami`) and one prompt (`prepare_for_next_session`). **stdout is the JSON-RPC channel** — the file redirects `console.log`/`console.info` to stderr and sets `RAG_QUIET=1` before any other require; keep it that way when adding logging anywhere the tools reach. MCP calls are logged to stderr only; they are not written to `AgentRun` and do not count against the in-app token budget (no model call happens server-side — the client's model does the reasoning).
 
-Register with Claude Code: `claude mcp add sankalp -e MCP_USER_EMAIL=<email> -- node <abs path>/server/mcp/server.js`.
+Register with Claude Code: `claude mcp add saakshi -e MCP_USER_EMAIL=<email> -- node <abs path>/server/mcp/server.js`.
 
 ### Evals — `server/evals/`
 

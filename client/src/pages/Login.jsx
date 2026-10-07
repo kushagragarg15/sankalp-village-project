@@ -5,7 +5,7 @@ import PhotoFan from '../components/PhotoFan';
 import { LOGIN_PRINTS } from '../data/villagePhotos';
 import { GoogleOAuthProvider, GoogleLogin, useGoogleOAuth } from '@react-oauth/google';
 import DotGrid from '../components/DotGrid';
-import logoImage from '../assets/sankalp-logo.jpg';
+import logoImage from '../assets/saakshi-mark.svg';
 
 // A faint ruled surface for the board panels — the same structural idea as
 // the app's spine and table hairlines, turned into ambient texture instead
@@ -232,8 +232,9 @@ export default function Login() {
             active" signal. */}
         <div className="relative overflow-hidden bg-board px-5 py-7 sm:px-8 lg:hidden" style={BOARD_TEXTURE}>
           <div className="relative flex animate-rise-in items-center gap-2.5">
-            <img src={logoImage} alt="" className="h-8 w-8 rounded object-cover" />
-            <span className="type-title text-[15px] text-paper">Sankalp Club</span>
+            <img src={logoImage} alt="" className="h-8 w-8 rounded" />
+            <span className="type-title text-[15px] text-paper">Saakshi</span>
+            <span className="text-[13px] text-board-400">· Sankalp Club</span>
           </div>
 
           <p
@@ -294,8 +295,9 @@ export default function Login() {
           </div>
 
           <div className="relative flex animate-rise-in items-center gap-3">
-            <img src={logoImage} alt="" className="h-9 w-9 rounded object-cover" />
-            <span className="type-title text-[16px] text-paper">Sankalp Club</span>
+            <img src={logoImage} alt="" className="h-9 w-9 rounded" />
+            <span className="type-title text-[16px] text-paper">Saakshi</span>
+            <span className="text-[14px] text-board-400">· Sankalp Club</span>
           </div>
 
           <div className="relative">

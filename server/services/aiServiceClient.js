@@ -26,7 +26,7 @@ const isConfigured = () => Boolean(AI_SERVICE_URL && AI_SERVICE_TOKEN);
 // service-to-service handshake. Never used for anything role-gated beyond
 // that; ingestion (POST /rag/resources) is admin-only on the Python side, so
 // callers that need it pass the real req.user instead.
-const SYSTEM_USER = { id: 'system', role: 'admin', name: 'Sankalp RAG' };
+const SYSTEM_USER = { id: 'system', role: 'admin', name: 'Saakshi RAG' };
 
 const headersFor = (user, { body, requestId }) => {
   if (!user?.id || !user?.role || !user?.name) {
@@ -34,9 +34,9 @@ const headersFor = (user, { body, requestId }) => {
   }
   return {
     Authorization: `Bearer ${AI_SERVICE_TOKEN}`,
-    'X-Sankalp-User-Id': String(user.id),
-    'X-Sankalp-User-Role': String(user.role),
-    'X-Sankalp-User-Name': encodeURIComponent(user.name),
+    'X-Saakshi-User-Id': String(user.id),
+    'X-Saakshi-User-Role': String(user.role),
+    'X-Saakshi-User-Name': encodeURIComponent(user.name),
     'X-Request-Id': requestId,
     ...(body ? { 'Content-Type': 'application/json' } : {})
   };
