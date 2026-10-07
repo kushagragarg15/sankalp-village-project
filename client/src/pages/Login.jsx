@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { GoogleOAuthProvider, GoogleLogin, useGoogleOAuth } from '@react-oauth/google';
 import PhotoWall from '../components/PhotoWall';
+import ParticleText from '../components/ParticleText';
 
 function EyeIcon({ crossed }) {
   return (
@@ -181,18 +182,33 @@ export default function Login() {
 
   return (
     <GoogleOAuthProvider clientId={googleClientId} onScriptLoadError={() => setGoogleScriptFailed(true)}>
-      <div className="relative min-h-screen bg-board text-paper">
+      {/* overflow-x-clip: the particles start up to 190px outside the word. */}
+      <div className="relative min-h-screen overflow-x-clip bg-board text-paper">
         <PhotoWall />
         {/* One flat dim, nothing graded: the photos stay sharp, the type stays readable. */}
         <div aria-hidden="true" className="pointer-events-none fixed inset-0 bg-board/80" />
 
         <div className="relative mx-auto flex min-h-screen w-full max-w-[1400px] flex-col justify-center gap-10 px-5 py-10 sm:px-8 lg:flex-row lg:items-center lg:justify-between lg:gap-16 lg:px-12 xl:px-16">
           <div>
-            <h1
-              className="select-none text-[clamp(4.25rem,15vw,7rem)] leading-[0.9] tracking-[-0.04em] text-paper lg:text-[clamp(7rem,12.5vw,13rem)]"
-              style={{ fontStretch: '125%', fontWeight: 800 }}
-            >
-              Saakshi
+            <h1 className="select-none leading-[0.9] tracking-[-0.04em]">
+              <ParticleText
+                text="Saakshi"
+                textClassName="text-[clamp(4.25rem,15vw,7rem)] lg:text-[clamp(7rem,12.5vw,13rem)]"
+                fontStretch="125%"
+                fontWeight={800}
+                particleSize={2.2}
+                density={4}
+                color="#F1F2EE"
+                highlightColor="#E9A83A"
+                scatter={190}
+                gatherDuration={1600}
+                stagger={420}
+                pointerRepel={42}
+                repelRadius={120}
+                idleDrift={0.8}
+                trigger="mount"
+                glow
+              />
             </h1>
             <p className="mt-4 text-[clamp(1.05rem,1.8vw,1.5rem)] font-medium leading-snug text-paper/85 lg:mt-6">
               Every hour of good, on the record.
