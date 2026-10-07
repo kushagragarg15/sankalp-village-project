@@ -17,12 +17,16 @@ const BOARD = [23, 33, 31]; // board
 const CELL_EMPTY = [30, 43, 40]; // board-700
 const GOLD = [233, 168, 58]; // gold-bright
 
+// Sizes are CSS px; everything is drawn in whole device pixels (see layout)
+// so cell edges stay sharp at any display scaling.
+const CELL = { phone: 14, desktop: 20 };
+const GAP = 2;
 const MAX_LIFT = 13; // px a fully-moved cell rises
 const POINTER_RADIUS = 130; // px around the pointer that feels its motion
 const APPEAR_MS = 320; // one cell fading in
 const WRITE_MS = 900; // the left-to-right sweep across the whole wall
-const SATURATION = 0.75; // how much of the photo's colour survives
-const BRIGHTNESS = 0.95; // cap, so the picture never glares under the copy
+const SATURATION = 0.85; // how much of the photo's colour survives
+const BRIGHTNESS = 0.92; // cap, so the picture never glares under the copy
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 const luminance = (r, g, b) => (0.299 * r + 0.587 * g + 0.114 * b) / 255;
@@ -57,7 +61,7 @@ export default function WitnessGrid({ image, label, className = '' }) {
   // Everything the render loop touches lives here, not in React state: it
   // changes sixty times a second and nothing outside the canvas reads it.
   const s = useRef({
-    w: 0, h: 0, cell: 22, cols: 0, rows: 0, ox: 0, oy: 0,
+    w: 0, h: 0, dpr: 1, cell: 20, gap: 2, cols: 0, rows: 0, ox: 0, oy: 0,
     rgb: null, lift: null, motion: null, delay: null,
     start: 0, raf: 0, running: false,
     impulses: [], lastPointer: null, reduced: false,
@@ -95,13 +99,14 @@ export default function WitnessGrid({ image, label, className = '' }) {
     const canvas = canvasRef.current;
     if (!canvas || !st.cols) return false;
     const ctx = canvas.getContext('2d');
-    const dpr = window.devicePixelRatio || 1;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Device pixels throughout: no transform, so whole numbers stay whole.
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const maxLift = MAX_LIFT * st.dpr;
 
     // Every pointer move since the last frame stirs the cells around it,
     // harder the faster it went.
     for (const { x, y, amount } of st.impulses) {
-      const r = POINTER_RADIUS;
+      const r = POINTER_RADIUS * st.dpr;
       const c0 = Math.max(0, Math.floor((x - st.ox - r) / st.cell));
       const c1 = Math.min(st.cols - 1, Math.ceil((x - st.ox + r) / st.cell));
       const r0 = Math.max(0, Math.floor((y - st.oy - r) / st.cell));
@@ -121,7 +126,7 @@ export default function WitnessGrid({ image, label, className = '' }) {
     ctx.fillStyle = `rgb(${BOARD[0]},${BOARD[1]},${BOARD[2]})`;
     ctx.fillRect(0, 0, st.w, st.h);
 
-    const gap = Math.max(1, st.cell * 0.14);
+    const gap = st.gap;
     const size = st.cell - gap;
     const elapsed = now - st.start;
     const loaded = Boolean(imageRef.current);
@@ -130,14 +135,14 @@ export default function WitnessGrid({ image, label, className = '' }) {
     for (let row = 0; row < st.rows; row++) {
       for (let col = 0; col < st.cols; col++) {
         const i = row * st.cols + col;
-        const x = st.ox + col * st.cell + gap / 2;
-        const y = st.oy + row * st.cell + gap / 2;
+        const x = st.ox + col * st.cell;
+        const y = st.oy + row * st.cell;
 
         const appear = !loaded ? 0 : st.reduced ? 1 : clamp01((elapsed - st.delay[i]) / APPEAR_MS);
         if (loaded && appear < 1) busy = true;
 
         st.motion[i] *= 0.93;
-        st.lift[i] += ((st.reduced ? 0 : st.motion[i] * MAX_LIFT) - st.lift[i]) * 0.14;
+        st.lift[i] += ((st.reduced ? 0 : st.motion[i] * maxLift) - st.lift[i]) * 0.14;
         const e = st.lift[i];
         if (e > 0.05) busy = true;
 
@@ -148,7 +153,7 @@ export default function WitnessGrid({ image, label, className = '' }) {
           continue;
         }
 
-        const gold = Math.min(1, e / MAX_LIFT) * 0.95;
+        const gold = Math.min(1, e / maxLift) * 0.95;
         let r = CELL_EMPTY[0] + (st.rgb[i * 3] - CELL_EMPTY[0]) * appear;
         let g = CELL_EMPTY[1] + (st.rgb[i * 3 + 1] - CELL_EMPTY[1]) * appear;
         let b = CELL_EMPTY[2] + (st.rgb[i * 3 + 2] - CELL_EMPTY[2]) * appear;
@@ -156,11 +161,11 @@ export default function WitnessGrid({ image, label, className = '' }) {
         g += (GOLD[1] - g) * gold;
         b += (GOLD[2] - b) * gold;
 
-        if (e > 0.4) {
-          const dx = -e * 0.8;
-          const dy = -e * 1.2;
+        if (e > 0.4 * st.dpr) {
+          const dx = Math.round(-e * 0.8);
+          const dy = Math.round(-e * 1.2);
           ctx.fillStyle = `rgba(0,0,0,${Math.min(0.55, e * 0.06)})`;
-          ctx.fillRect(x + e * 0.6, y + e * 0.9, size, size);
+          ctx.fillRect(x + Math.round(e * 0.6), y + Math.round(e * 0.9), size, size);
           // Right and bottom faces, so a lifted cell reads as a block.
           ctx.fillStyle = `rgb(${Math.max(0, r - 90) | 0},${Math.max(0, g - 90) | 0},${Math.max(0, b - 90) | 0})`;
           ctx.beginPath();
@@ -209,21 +214,26 @@ export default function WitnessGrid({ image, label, className = '' }) {
     const st = s.current;
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const width = window.innerWidth;
-    const height = window.innerHeight;
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.round(width * dpr);
-    canvas.height = Math.round(height * dpr);
+    const width = Math.round(window.innerWidth * dpr);
+    const height = Math.round(window.innerHeight * dpr);
+    canvas.width = width;
+    canvas.height = height;
+    st.dpr = dpr;
     st.w = width;
     st.h = height;
-    st.cell = width < 640 ? 12 : 16;
+    // Whole device pixels for the cell, the gap and the offsets: a cell that
+    // starts at x = 41.6 gets anti-aliased edges, and a wall of those reads
+    // as blur.
+    st.cell = Math.round((window.innerWidth < 640 ? CELL.phone : CELL.desktop) * dpr);
+    st.gap = Math.max(1, Math.round(GAP * dpr));
     const cols = Math.ceil(width / st.cell);
     const rows = Math.ceil(height / st.cell);
     const resized = cols !== st.cols || rows !== st.rows;
     st.cols = cols;
     st.rows = rows;
-    st.ox = (width - cols * st.cell) / 2;
-    st.oy = (height - rows * st.cell) / 2;
+    st.ox = Math.floor((width - cols * st.cell) / 2);
+    st.oy = Math.floor((height - rows * st.cell) / 2);
     if (resized) {
       const n = cols * rows;
       st.rgb = new Float32Array(n * 3);
@@ -264,7 +274,7 @@ export default function WitnessGrid({ image, label, className = '' }) {
       st.lastPointer = { x: e.clientX, y: e.clientY, t: now };
       if (!last || now - last.t > 120) return;
       const speed = Math.hypot(e.clientX - last.x, e.clientY - last.y) / Math.max(1, now - last.t); // px/ms
-      st.impulses.push({ x: e.clientX, y: e.clientY, amount: clamp01(speed * 1.4) });
+      st.impulses.push({ x: e.clientX * st.dpr, y: e.clientY * st.dpr, amount: clamp01(speed * 1.4) });
       kick();
     };
 
