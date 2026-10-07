@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LOGIN_PRINTS } from '../data/villagePhotos';
+import { LOGIN_PHOTOS } from '../data/loginPhotos';
 import { GoogleOAuthProvider, GoogleLogin, useGoogleOAuth } from '@react-oauth/google';
 import WitnessGrid from '../components/WitnessGrid';
 import logoImage from '../assets/saakshi-mark.svg';
@@ -77,13 +77,13 @@ function DemoButton({ label, detail, pending, disabled, onClick }) {
       onClick={onClick}
       disabled={disabled}
       aria-busy={pending}
-      className="flex min-h-[3.5rem] w-full flex-col items-start justify-center rounded-md border border-rule-strong bg-paper px-3.5 py-2.5 text-left transition-colors duration-150 hover:border-board hover:bg-surface active:bg-paper-deep disabled:cursor-not-allowed disabled:opacity-60"
+      className="flex min-h-[3.5rem] w-full flex-col items-start justify-center rounded-md border border-paper/15 bg-board/70 px-3.5 py-2.5 text-left backdrop-blur-sm transition-colors duration-150 hover:border-paper/35 hover:bg-board-700/90 disabled:cursor-not-allowed disabled:opacity-60"
     >
-      <span className="flex items-center gap-2 text-sm font-medium text-ink">
-        {pending && <SpinnerIcon className="text-ink-2" />}
+      <span className="flex items-center gap-2 text-sm font-medium text-paper">
+        {pending && <SpinnerIcon className="text-paper/70" />}
         {pending ? 'Opening demo' : label}
       </span>
-      <span className="mt-0.5 text-[12px] text-ink-3">{detail}</span>
+      <span className="mt-0.5 text-[12px] text-paper/55">{detail}</span>
     </button>
   );
 }
@@ -113,8 +113,8 @@ function GoogleSignInButton({ onSuccess, onError, disabled, scriptFailed }) {
 
   if (scriptFailed) {
     return (
-      <div className="flex h-11 w-full items-center justify-center rounded-md border border-dashed border-rule-strong px-3 text-center text-[13px] text-ink-3">
-        Google sign-in isn&rsquo;t available right now — use your email and password above.
+      <div className="flex h-11 w-full items-center justify-center rounded-md border border-dashed border-paper/20 px-3 text-center text-[13px] text-paper/55">
+        Google sign-in isn&rsquo;t available right now. Use your email and password.
       </div>
     );
   }
@@ -128,7 +128,7 @@ function GoogleSignInButton({ onSuccess, onError, disabled, scriptFailed }) {
     >
       <div
         aria-hidden="true"
-        className={`absolute inset-0 rounded-md border border-rule bg-surface transition-opacity duration-300 ${
+        className={`absolute inset-0 rounded-md border border-paper/15 bg-board/70 transition-opacity duration-300 ${
           ready ? 'opacity-0' : 'opacity-100'
         }`}
       />
@@ -141,7 +141,7 @@ function GoogleSignInButton({ onSuccess, onError, disabled, scriptFailed }) {
           <GoogleLogin
             onSuccess={onSuccess}
             onError={onError}
-            theme="outline"
+            theme="filled_black"
             size="large"
             shape="rectangular"
             text="continue_with"
@@ -162,8 +162,8 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [googleScriptFailed, setGoogleScriptFailed] = useState(false);
   const [demoRole, setDemoRole] = useState(null);
-  // A different afternoon from the village on each visit.
-  const [photo] = useState(() => LOGIN_PRINTS[Math.floor(Math.random() * LOGIN_PRINTS.length)]);
+  // A different afternoon from the sessions on each visit.
+  const [photo] = useState(() => LOGIN_PHOTOS[Math.floor(Math.random() * LOGIN_PHOTOS.length)]);
   const { login, demoLogin } = useAuth();
   const navigate = useNavigate();
 
@@ -223,48 +223,49 @@ export default function Login() {
     setError('Google sign-in was cancelled. Try again or use your password.');
   };
 
+  // Fields sit straight on the board: translucent so the wall shows through,
+  // solid enough that typed text never competes with a bright cell.
   const fieldBaseClass =
-    'w-full h-11 rounded-md border bg-surface px-3.5 text-[15px] text-ink placeholder:text-ink-3 outline-none transition-[border-color,box-shadow,background-color] duration-200 ease-out focus:ring-1 disabled:bg-paper-deep disabled:text-ink-3';
+    'w-full h-11 rounded-md border bg-board/75 px-3.5 text-[15px] text-paper placeholder:text-paper/40 outline-none backdrop-blur-sm transition-[border-color,box-shadow,background-color] duration-200 ease-out focus:bg-board/90 focus:ring-1 disabled:opacity-60';
   const fieldToneClass = error
-    ? 'border-brick focus:border-brick focus:ring-brick'
-    : 'border-rule hover:border-rule-strong focus:border-board focus:ring-board';
+    ? 'border-[#E58A80] focus:border-[#E58A80] focus:ring-[#E58A80]'
+    : 'border-paper/15 hover:border-paper/30 focus:border-gold-bright focus:ring-gold-bright';
 
   return (
     <GoogleOAuthProvider clientId={googleClientId} onScriptLoadError={() => setGoogleScriptFailed(true)}>
-      <div className="flex min-h-screen flex-col bg-paper lg:grid lg:grid-cols-[1.3fr_1fr]">
-        {/* The witness wall: an afternoon from the village, written into the
-            board one record at a time. Everything over it is copy. */}
-        <WitnessGrid
-          image={photo.small}
-          label={photo.alt}
-          className="h-[62svh] min-h-[440px] lg:h-auto lg:min-h-screen"
-        >
-          {/* The board rises behind the words so they stay readable over any
-              photo; the top keeps a little shade for the wordmark. */}
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(23,33,31,0.96)_0%,rgba(23,33,31,0.86)_26%,rgba(23,33,31,0.12)_56%,rgba(23,33,31,0)_100%)]"
-          />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[linear-gradient(to_bottom,rgba(23,33,31,0.88),rgba(23,33,31,0))]"
-          />
+      <div className="relative min-h-screen bg-board text-paper">
+        {/* One background for the whole page: an afternoon from the sessions,
+            written into the board one record at a time. */}
+        <WitnessGrid image={photo.src} label={photo.alt} />
 
-          <div className="pointer-events-none relative flex h-full flex-col justify-between p-5 sm:p-8 lg:p-12 xl:p-16">
-            <div className="flex items-center gap-2.5">
-              <img src={logoImage} alt="" className="h-9 w-9 rounded" />
-              <span className="type-title text-[17px] text-paper">Saakshi</span>
-              <span className="text-[13px] text-paper/70">for Sankalp Club</span>
-            </div>
+        {/* Shade so every word stays readable over any photo: heavier on the
+            left under the headline and on the right under the form, lighter
+            through the middle where the picture can breathe. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 bg-[linear-gradient(to_top,rgba(23,33,31,0.9)_0%,rgba(23,33,31,0.5)_50%,rgba(23,33,31,0.2)_100%)] lg:bg-[linear-gradient(to_right,rgba(23,33,31,0.35)_0%,rgba(23,33,31,0.05)_42%,rgba(23,33,31,0.72)_68%,rgba(23,33,31,0.86)_100%)]"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 hidden bg-[linear-gradient(to_top,rgba(23,33,31,0.85)_0%,rgba(23,33,31,0.4)_30%,rgba(23,33,31,0)_55%),linear-gradient(to_bottom,rgba(23,33,31,0.6)_0%,rgba(23,33,31,0)_18%)] lg:block"
+        />
 
-            <div>
+        <div className="relative mx-auto flex min-h-screen w-full max-w-[1400px] flex-col px-5 py-6 sm:px-8 sm:py-8 lg:px-12 lg:py-12 xl:px-16">
+          <header className="flex items-center gap-2.5">
+            <img src={logoImage} alt="" className="h-9 w-9 rounded" />
+            <span className="type-title text-[17px] text-paper">Saakshi</span>
+            <span className="text-[13px] text-paper/70">for Sankalp Club</span>
+          </header>
+
+          <div className="flex flex-1 flex-col justify-end gap-12 pt-16 lg:grid lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-end lg:gap-16 lg:pt-12 xl:gap-24">
+            <section>
               <h1
                 className="max-w-[11ch] text-[clamp(2.4rem,5.6vw,5.5rem)] leading-[0.96] tracking-[-0.03em] text-paper"
                 style={{ fontStretch: '125%', fontWeight: 800 }}
               >
                 Good work deserves a witness.
               </h1>
-              <p className="mt-5 hidden max-w-[46ch] text-[15px] leading-relaxed text-paper/75 sm:block lg:mt-6 lg:text-[16px]">
+              <p className="mt-5 max-w-[46ch] text-[15px] leading-relaxed text-paper/80 lg:mt-6 lg:text-[16px]">
                 Volunteers teach, feed and care for people every weekend, and most of that work is
                 never written down. Saakshi records it where it happens, so the volunteers, the people
                 they serve and the people who fund them can all trust that it happened.
@@ -279,164 +280,150 @@ export default function Login() {
               </ul>
               <Link
                 to="/village"
-                className="pointer-events-auto mt-6 inline-block text-[13px] text-paper/60 underline-offset-4 transition-colors hover:text-paper hover:underline lg:mt-8"
+                className="mt-6 inline-block text-[13px] text-paper/60 underline-offset-4 transition-colors hover:text-paper hover:underline lg:mt-8"
               >
                 See the village we teach in
               </Link>
-            </div>
-          </div>
-        </WitnessGrid>
+            </section>
 
-        <main className="flex flex-1 flex-col items-center justify-center px-5 py-10 sm:px-8 sm:py-12 lg:min-h-screen lg:py-12">
-          <div className="w-full max-w-[26rem]">
-            <h2 className="type-display text-[26px] text-ink lg:text-[30px]">Sign in</h2>
-            <p className="mt-2 text-sm text-ink-2">
-              Use the account your coordinator set up for you.
-            </p>
+            <main className="w-full max-w-[26rem] lg:max-w-none">
+              <h2 className="type-display text-[26px] text-paper lg:text-[30px]">Sign in</h2>
+              <p className="mt-2 text-sm text-paper/70">
+                Use the account your coordinator set up for you.
+              </p>
 
-            <div className="mt-7 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <DemoButton
-                label="Demo as volunteer"
-                detail="One click, sample data"
-                pending={demoRole === 'volunteer'}
-                disabled={busy}
-                onClick={() => handleDemo('volunteer')}
-              />
-              <DemoButton
-                label="Demo as coordinator"
-                detail="One click, sample data"
-                pending={demoRole === 'coordinator'}
-                disabled={busy}
-                onClick={() => handleDemo('coordinator')}
-              />
-            </div>
-
-            {error && (
-              <div
-                role="alert"
-                className="mt-6 flex items-start gap-2.5 rounded-md border border-brick-line bg-brick-wash px-3.5 py-3 animate-rise-in"
-              >
-                <AlertIcon className="mt-0.5 shrink-0 text-brick" />
-                <p className="text-[13px] leading-relaxed text-brick">{error}</p>
-              </div>
-            )}
-
-            <div className="mt-6 flex items-center gap-3">
-              <span className="h-px flex-1 bg-rule" />
-              <span className="text-[13px] text-ink-3">or sign in with your account</span>
-              <span className="h-px flex-1 bg-rule" />
-            </div>
-
-            <form onSubmit={handleSubmit} className="mt-5 space-y-4" noValidate>
-              <div>
-                <label htmlFor="email" className="block text-[13px] font-medium text-ink mb-1.5">
-                  Email
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  value={email}
+              <div className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <DemoButton
+                  label="Demo as volunteer"
+                  detail="One click, sample data"
+                  pending={demoRole === 'volunteer'}
                   disabled={busy}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    setError('');
-                  }}
-                  placeholder="you@lnmiit.ac.in"
-                  className={`${fieldBaseClass} ${fieldToneClass}`}
+                  onClick={() => handleDemo('volunteer')}
+                />
+                <DemoButton
+                  label="Demo as coordinator"
+                  detail="One click, sample data"
+                  pending={demoRole === 'coordinator'}
+                  disabled={busy}
+                  onClick={() => handleDemo('coordinator')}
                 />
               </div>
 
-              <div>
-                <div className="mb-1.5 flex items-baseline justify-between gap-3">
-                  <label htmlFor="password" className="text-[13px] font-medium text-ink">
-                    Password
-                  </label>
-                  <span className="text-[12px] text-ink-3">Forgot it? Ask your coordinator.</span>
+              {error && (
+                <div
+                  role="alert"
+                  className="mt-5 flex items-start gap-2.5 rounded-md border border-[#E58A80]/50 bg-[#A32C24]/30 px-3.5 py-3 backdrop-blur-sm animate-rise-in"
+                >
+                  <AlertIcon className="mt-0.5 shrink-0 text-[#F2B3AB]" />
+                  <p className="text-[13px] leading-relaxed text-[#F7D2CD]">{error}</p>
                 </div>
-                <div className="relative">
+              )}
+
+              <form onSubmit={handleSubmit} className="mt-6 space-y-4" noValidate>
+                <div>
+                  <label htmlFor="email" className="mb-1.5 block text-[13px] font-medium text-paper/85">
+                    Email
+                  </label>
                   <input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    autoComplete="current-password"
-                    value={password}
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
                     disabled={busy}
                     onChange={(e) => {
-                      setPassword(e.target.value);
+                      setEmail(e.target.value);
                       setError('');
                     }}
-                    placeholder="Your password"
-                    className={`${fieldBaseClass} ${fieldToneClass} pr-11`}
+                    placeholder="you@lnmiit.ac.in"
+                    className={`${fieldBaseClass} ${fieldToneClass}`}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    disabled={busy}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    className="absolute right-1 top-1 h-9 w-9 inline-flex items-center justify-center rounded text-ink-2 transition-colors hover:text-ink hover:bg-paper active:scale-95 disabled:pointer-events-none"
-                  >
-                    <EyeIcon crossed={showPassword} />
-                  </button>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={busy}
-                aria-busy={loading}
-                className="relative h-11 w-full overflow-hidden rounded-md bg-board text-sm font-medium text-paper transition-colors duration-150 hover:bg-board-600 active:bg-board-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <span
-                  aria-hidden={loading}
-                  className={`absolute inset-0 flex items-center justify-center transition-opacity duration-150 ${
-                    loading ? 'opacity-0' : 'opacity-100'
-                  }`}
-                >
-                  Sign in
-                </span>
-                <span
-                  aria-hidden={!loading}
-                  className={`absolute inset-0 flex items-center justify-center gap-2 transition-opacity duration-150 ${
-                    loading ? 'opacity-100' : 'opacity-0'
-                  }`}
-                >
-                  <SpinnerIcon />
-                  Signing in
-                </span>
-                {/* The same filling rule the Button component carries, so the
-                    first thing anyone sees waiting and every wait after it
-                    speak the same language. */}
-                {loading && (
-                  <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[2px]">
-                    <span className="absolute inset-0 bg-current opacity-[0.18]" />
-                    <span className="absolute inset-0 origin-left bg-current animate-work-fill" />
-                  </span>
-                )}
-              </button>
-            </form>
-
-            {googleClientId && (
-              <>
-                <div className="my-6 flex items-center gap-3">
-                  <span className="h-px flex-1 bg-rule" />
-                  <span className="text-[13px] text-ink-3">or</span>
-                  <span className="h-px flex-1 bg-rule" />
                 </div>
 
-                <GoogleSignInButton
-                  onSuccess={handleGoogleSuccess}
-                  onError={handleGoogleError}
+                <div>
+                  <div className="mb-1.5 flex items-baseline justify-between gap-3">
+                    <label htmlFor="password" className="text-[13px] font-medium text-paper/85">
+                      Password
+                    </label>
+                    <span className="text-[12px] text-paper/55">Forgot it? Ask your coordinator.</span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
+                      value={password}
+                      disabled={busy}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        setError('');
+                      }}
+                      placeholder="Your password"
+                      className={`${fieldBaseClass} ${fieldToneClass} pr-11`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      disabled={busy}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      className="absolute right-1 top-1 inline-flex h-9 w-9 items-center justify-center rounded text-paper/60 transition-colors hover:bg-paper/10 hover:text-paper active:scale-95 disabled:pointer-events-none"
+                    >
+                      <EyeIcon crossed={showPassword} />
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
                   disabled={busy}
-                  scriptFailed={googleScriptFailed}
-                />
-              </>
-            )}
+                  aria-busy={loading}
+                  className="relative h-11 w-full overflow-hidden rounded-md bg-paper text-sm font-semibold text-board transition-colors duration-150 hover:bg-white active:bg-paper-deep disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <span
+                    aria-hidden={loading}
+                    className={`absolute inset-0 flex items-center justify-center transition-opacity duration-150 ${
+                      loading ? 'opacity-0' : 'opacity-100'
+                    }`}
+                  >
+                    Sign in
+                  </span>
+                  <span
+                    aria-hidden={!loading}
+                    className={`absolute inset-0 flex items-center justify-center gap-2 transition-opacity duration-150 ${
+                      loading ? 'opacity-100' : 'opacity-0'
+                    }`}
+                  >
+                    <SpinnerIcon />
+                    Signing in
+                  </span>
+                  {/* The same filling rule the Button component carries, so the
+                      first thing anyone sees waiting and every wait after it
+                      speak the same language. */}
+                  {loading && (
+                    <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[2px]">
+                      <span className="absolute inset-0 bg-current opacity-[0.18]" />
+                      <span className="absolute inset-0 origin-left bg-current animate-work-fill" />
+                    </span>
+                  )}
+                </button>
+              </form>
 
-            <p className="mt-10 text-[12px] text-ink-3">
-              Saakshi (<span lang="hi">साक्षी</span>) is Hindi for witness.
-            </p>
+              {googleClientId && (
+                <div className="mt-3">
+                  <GoogleSignInButton
+                    onSuccess={handleGoogleSuccess}
+                    onError={handleGoogleError}
+                    disabled={busy}
+                    scriptFailed={googleScriptFailed}
+                  />
+                </div>
+              )}
+
+              <p className="mt-8 text-[12px] text-paper/50">
+                Saakshi (<span lang="hi">साक्षी</span>) is Hindi for witness.
+              </p>
+            </main>
           </div>
-        </main>
+        </div>
       </div>
     </GoogleOAuthProvider>
   );
