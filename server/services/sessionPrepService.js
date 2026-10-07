@@ -9,7 +9,7 @@ const { tools, normaliseSubject } = require('./agentTools');
 /**
  * Session prep — a *workflow*, not an agent.
  *
- * "Ask Sankalp" lets the model decide which tools to call. Here the steps are
+ * "Ask Saakshi" lets the model decide which tools to call. Here the steps are
  * fixed and the model is only asked to do the two things that need judgment:
  * choose what to focus on, and write the teaching blocks. Everything else —
  * what data to gather, when to retrieve, what to save — is ordinary code.

@@ -118,7 +118,7 @@ export default function AttendanceReport() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `sankalp-attendance-${session.title.replace(/\s+/g, '-')}.csv`;
+    link.download = `saakshi-attendance-${session.title.replace(/\s+/g, '-')}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

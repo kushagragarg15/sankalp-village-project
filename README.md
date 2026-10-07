@@ -1,6 +1,8 @@
-# Sankalp — Rural Education Management System
+# Saakshi — verified field records for volunteer programs
 
-A full-stack platform for a student club that runs weekend teaching sessions for children in a village school. It coordinates volunteers, records who taught whom (verified by a rotating code and a geofence), tracks each child's progress, and puts an AI assistant, a RAG lesson planner and a human-in-the-loop session-prep workflow on top of that data.
+*Saakshi* (साक्षी) means "witness". It is a full-stack platform for organisations that run programs through volunteers: it coordinates volunteers, records who taught whom (verified on site by a rotating code and a geofence), tracks each beneficiary's progress, and puts an AI assistant, a RAG lesson planner and a human-in-the-loop session-prep workflow on top of that data. Every hour of good, on the record.
+
+Saakshi grew out of, and is used by, **Sankalp Club** — a student club at LNMIIT, Jaipur that runs weekend teaching sessions for children in a village school. The examples, seed data and demo accounts below are Sankalp Club's.
 
 Three services, one PostgreSQL database:
 
@@ -21,7 +23,7 @@ Three services, one PostgreSQL database:
 - [Authentication and roles](#authentication-and-roles)
 - [Attendance flow](#attendance-flow)
 - [AI features](#ai-features)
-  - [Ask Sankalp — the LangGraph agent](#ask-sankalp--the-langgraph-agent)
+  - [Ask Saakshi — the LangGraph agent](#ask-saakshi--the-langgraph-agent)
   - [RAG lesson planner](#rag-lesson-planner)
   - [Session prep — workflow with human sign-off](#session-prep--workflow-with-human-sign-off)
   - [Guardrails and observability](#guardrails-and-observability)
@@ -83,7 +85,7 @@ flowchart LR
     end
 
     subgraph Py["Python AI service — ai-service/ :8000"]
-        IA["require_internal_auth<br/>shared token + X-Sankalp-User-*"]
+        IA["require_internal_auth<br/>shared token + X-Saakshi-User-*"]
         RAG["/rag<br/>embed · retrieve · lesson-plan · resources"]
         AG["/agent<br/>ask · ask/stream"]
         Graph["LangGraph<br/>agent ⇄ tools"]
@@ -116,7 +118,7 @@ flowchart LR
 **Design points**
 
 - **One database, two drivers.** Node uses Drizzle ORM over `pg`; Python uses `asyncpg`. Both read and write the same tables; vector search happens only in Python (`app/rag/retriever.py`) so there is exactly one similarity implementation.
-- **The browser never talks to Python.** Node resolves the JWT into a trusted `{ id, role, name }`, then forwards that under a shared secret (`AI_SERVICE_TOKEN`) in `X-Sankalp-User-*` headers with an `X-Request-Id` for cross-service tracing. Python never re-derives a role from a token it can see.
+- **The browser never talks to Python.** Node resolves the JWT into a trusted `{ id, role, name }`, then forwards that under a shared secret (`AI_SERVICE_TOKEN`) in `X-Saakshi-User-*` headers with an `X-Request-Id` for cross-service tracing. Python never re-derives a role from a token it can see.
 - **Guardrails live in one place.** Rate limiting and the per-user daily token budget are Express middleware in front of every token-spending route; `ai-service` does not re-implement them.
 - **Streaming is pass-through.** `POST /api/ai/ask/stream` opens an SSE connection to `ai-service` and pipes the bytes to the browser; the answer is never assembled in Node.
 - **The tool registry exists twice, on purpose.** `ai-service/app/tools` is the authoritative implementation used by the agent. `server/services/agentTools.js` is the Node copy still used by the session-prep workflow and the MCP server; both return identically shaped data. New tool logic belongs in Python.
@@ -160,7 +162,7 @@ sequenceDiagram
     N->>G: per-user sliding window (12 / 5 min)
     G->>D: SUM(tokens) today from agent_runs + lesson_plan_drafts
     G-->>N: under budget (X-AI-Tokens-Used-Today header)
-    N->>P: POST /agent/ask/stream<br/>Bearer AI_SERVICE_TOKEN + X-Sankalp-User-{Id,Role,Name} + X-Request-Id
+    N->>P: POST /agent/ask/stream<br/>Bearer AI_SERVICE_TOKEN + X-Saakshi-User-{Id,Role,Name} + X-Request-Id
     P->>P: require_internal_auth (constant-time compare)
     P->>D: load conversation history (last 12 msgs)
     loop LangGraph: agent → tools → agent (≤ 6)
@@ -394,7 +396,7 @@ classDiagram
     class mcpServer {
         +MCP_USER_EMAIL
         +tools (from agentTools)
-        +resource sankalp://whoami
+        +resource saakshi://whoami
         +prompt prepare_for_next_session
     }
 
@@ -422,7 +424,7 @@ classDiagram
     }
     class require_internal_auth {
         +Bearer AI_SERVICE_TOKEN
-        +X-Sankalp-User-Id / Role / Name
+        +X-Saakshi-User-Id / Role / Name
         +returns InternalUser
     }
     class ResolvedLLMConfig {
@@ -532,7 +534,7 @@ Rules the code enforces:
 
 ## Attendance flow
 
-Sankalp teaches on Saturday and Sunday mornings. A session is a time window; a volunteer proves presence with a short-lived code read out in the room and a location check.
+Sankalp Club teaches on Saturday and Sunday mornings. A session is a time window; a volunteer proves presence with a short-lived code read out in the room and a location check.
 
 ```mermaid
 sequenceDiagram
@@ -595,7 +597,7 @@ Provider selection is one env var. Every provider speaks the OpenAI wire format,
 
 Chat and embeddings are chosen separately (`EMBEDDING_PROVIDER`), because the cheapest chat model and the best embedding model rarely live in the same place. The default setup is **Groq for chat, Gemini for embeddings**. The similarity threshold is a property of the embedding model and lives next to the model name.
 
-### Ask Sankalp — the LangGraph agent
+### Ask Saakshi — the LangGraph agent
 
 `ai-service/app/agent/` — a minimal `StateGraph` with two nodes.
 
@@ -732,18 +734,18 @@ The budget is computed from the audit rows (`agent_runs` + `lesson_plan_drafts`)
 `server/mcp/server.js` exposes the same tool registry over the [Model Context Protocol](https://modelcontextprotocol.io) (stdio), so Claude Desktop, Claude Code or any MCP client can ask the club's data the same questions the in-app assistant can, with the same role scoping.
 
 - Runs **as one configured user** (`MCP_USER_EMAIL`) and exposes only that role's tools; refuses to start unscoped.
-- Tools carry `readOnlyHint` annotations; a `sankalp://whoami` resource and a `prepare_for_next_session` prompt cover the three MCP primitives.
+- Tools carry `readOnlyHint` annotations; a `saakshi://whoami` resource and a `prepare_for_next_session` prompt cover the three MCP primitives.
 - stdout is the protocol channel; all logging is redirected to stderr before anything loads.
 
 ```bash
 # Claude Code
-claude mcp add sankalp -e MCP_USER_EMAIL=you@example.com -- node /absolute/path/to/server/mcp/server.js
+claude mcp add saakshi -e MCP_USER_EMAIL=you@example.com -- node /absolute/path/to/server/mcp/server.js
 ```
 
 ```json
 {
   "mcpServers": {
-    "sankalp": {
+    "saakshi": {
       "command": "node",
       "args": ["/absolute/path/to/server/mcp/server.js"],
       "env": { "MCP_USER_EMAIL": "you@example.com" }
@@ -785,7 +787,7 @@ flowchart TD
     RT --> ST["/students, /students/:id"]
     RT --> AN["/analytics — Insights"]
     RT --> LP["/ai-notes — Lesson planner"]
-    RT --> ASK["/ask — Ask Sankalp, SSE"]
+    RT --> ASK["/ask — Ask Saakshi, SSE"]
     RT --> PR["/prep/:sessionId — Session prep"]
     RT --> AS["/admin-sessions (admin)"]
     RT --> AR["/attendance-report (admin)"]
@@ -821,7 +823,7 @@ cd sankalps-village-project
 ```env
 NODE_ENV=development
 PORT=5000
-DATABASE_URL=postgres://user:password@localhost:5432/sankalp
+DATABASE_URL=postgres://user:password@localhost:5432/saakshi
 DATABASE_SSL=false                      # leave unset for hosted Postgres
 JWT_SECRET=change_me
 CLIENT_URL=http://localhost:5173
@@ -975,7 +977,7 @@ Histogram buckets run 10 ms – 30 s so both the ordinary API (one database roun
 | `SCHOOL_LAT`, `SCHOOL_LNG`, `ATTENDANCE_RADIUS_M` | server | Default geofence when a session has no location (1000 m) |
 | `USER_CACHE_TTL_MS` | server | `protect()` user cache (15 s) |
 | `LOG_LEVEL`, `LOG_FORMAT`, `LOG_DESTINATION` | server | pino level (default `info`); `json` to disable pretty output in development; `stderr` (set by the MCP server) |
-| `MCP_USER_EMAIL` | MCP server | Which Sankalp user the MCP server acts as |
+| `MCP_USER_EMAIL` | MCP server | Which Saakshi user the MCP server acts as |
 | `MONGO_URI` | server | Legacy, optional — unset skips the connection; see Migration notes |
 
 ---
@@ -1049,7 +1051,7 @@ All routes are under `/api` and require `Authorization: Bearer <jwt>` (or the `t
 | POST | `/rag/embed`, `/rag/retrieve`, `/rag/lesson-plan`, `/rag/resources` | resources is admin-only (defence in depth) |
 | POST | `/agent/ask`, `/agent/ask/stream` | |
 
-Every internal call carries `Authorization: Bearer <AI_SERVICE_TOKEN>`, `X-Sankalp-User-Id`, `X-Sankalp-User-Role`, `X-Sankalp-User-Name` and `X-Request-Id`.
+Every internal call carries `Authorization: Bearer <AI_SERVICE_TOKEN>`, `X-Saakshi-User-Id`, `X-Saakshi-User-Role`, `X-Saakshi-User-Name` and `X-Request-Id`.
 
 ---
 
@@ -1108,7 +1110,7 @@ sankalps-village-project/
 │   │   │                           # LiveCode, Table, Modal, Prose, Chart, DotGrid, …
 │   │   ├── context/                # AuthContext, ToastContext, SessionsContext
 │   │   ├── pages/                  # Login, Dashboard, VolunteerSessions, AttendancePage, MyAttendanceNew,
-│   │   │                           # Students, StudentProgress, Analytics, AITeachingNotes, AskSankalp,
+│   │   │                           # Students, StudentProgress, Analytics, AITeachingNotes, AskSaakshi,
 │   │   │                           # SessionPrep, AdminSessions, AttendanceReport, Volunteers, AIActivity
 │   │   └── utils/                  # api.js (axios + SSE), session.js (state + formatting)
 │   ├── vercel.json
@@ -1146,7 +1148,7 @@ sankalps-village-project/
 │   ├── app/
 │   │   ├── main.py                 # app, lifespan pool, X-Request-Id middleware, /health, /internal/whoami
 │   │   ├── config.py               # pydantic-settings (same env names as Node)
-│   │   ├── internal_auth.py        # shared-token + X-Sankalp-User-* → InternalUser
+│   │   ├── internal_auth.py        # shared-token + X-Saakshi-User-* → InternalUser
 │   │   ├── llm.py                  # provider table (mirrors llmClient.js)
 │   │   ├── errors.py               # ProviderError envelope
 │   │   ├── db.py                   # asyncpg pool, pgvector codec, health
@@ -1185,4 +1187,4 @@ Removing `connectDB()`, `config/db.js`, `models/`, the two legacy scripts and th
 
 **Proprietary and Confidential** — All rights reserved.
 
-This software is proprietary to Sankalp. No permission is granted to use, copy, modify, or distribute without prior written authorization. See [LICENSE](LICENSE) for full terms.
+This software is proprietary to Saakshi. No permission is granted to use, copy, modify, or distribute without prior written authorization. See [LICENSE](LICENSE) for full terms.

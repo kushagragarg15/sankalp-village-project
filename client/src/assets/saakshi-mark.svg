@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Saakshi mark: a tick over a ruled line, "this entry, on the record". -->
+  <rect width="32" height="32" rx="7" fill="#17211F"/>
+  <path d="M9.5 14.5l4.5 4.5 8.5-9" fill="none" stroke="#E9A83A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M8 24h16" fill="none" stroke="#5C716A" stroke-width="1.6" stroke-linecap="round"/>
+</svg>

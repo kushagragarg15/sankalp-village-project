@@ -1,7 +1,7 @@
-# Sankalp AI service — Python/FastAPI (RAG + LangGraph agent).
+# Saakshi AI service — Python/FastAPI (RAG + LangGraph agent).
 #
-#   docker build -t sankalp-ai ./ai-service
-#   docker run --env-file ai-service/.env -p 8000:8000 sankalp-ai
+#   docker build -t saakshi-ai ./ai-service
+#   docker run --env-file ai-service/.env -p 8000:8000 saakshi-ai
 #
 # Only the Node API should be able to reach this container: its auth is a
 # shared secret, not user login. In compose it is deliberately not published

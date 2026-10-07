@@ -19,7 +19,7 @@ const MyAttendanceNew = lazy(() => import('./pages/MyAttendanceNew'));
 const Volunteers = lazy(() => import('./pages/Volunteers'));
 const Analytics = lazy(() => import('./pages/Analytics'));
 const AITeachingNotes = lazy(() => import('./pages/AITeachingNotes'));
-const AskSankalp = lazy(() => import('./pages/AskSankalp'));
+const AskSaakshi = lazy(() => import('./pages/AskSaakshi'));
 const SessionPrep = lazy(() => import('./pages/SessionPrep'));
 const AIActivity = lazy(() => import('./pages/AIActivity'));
 const AdminSessions = lazy(() => import('./pages/AdminSessions'));
@@ -51,7 +51,7 @@ const routes = [
   { path: '/volunteers', element: <Volunteers />, adminOnly: true },
   { path: '/analytics', element: <Analytics /> },
   { path: '/ai-notes', element: <AITeachingNotes /> },
-  { path: '/ask', element: <AskSankalp /> },
+  { path: '/ask', element: <AskSaakshi /> },
   { path: '/prep/:sessionId', element: <SessionPrep /> },
   { path: '/ai-activity', element: <AIActivity />, adminOnly: true },
   { path: '/admin-sessions', element: <AdminSessions />, adminOnly: true },

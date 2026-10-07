@@ -1,4 +1,4 @@
-# The AI in Sankalp — a beginner's guide to the agents, tools and workflows
+# The AI in Saakshi — a beginner's guide to the agents, tools and workflows
 
 This document explains every AI feature in this project from the ground up: what it does, why it is built the way it is, and exactly what happens — line by line where it matters — when someone uses it. It assumes you know what a web app and a database are, but **not** what an "agent", a "tool", "RAG" or "LangGraph" is. Those are explained as they come up.
 
@@ -15,7 +15,7 @@ If you only read one section, read [The big picture](#2-the-big-picture). If you
 5. [The LLM layer: talking to Groq, Gemini or OpenAI](#5-the-llm-layer-talking-to-groq-gemini-or-openai)
 6. [RAG — the lesson planner](#6-rag--the-lesson-planner)
 7. [Tools — what the agent is allowed to do](#7-tools--what-the-agent-is-allowed-to-do)
-8. [The agent — "Ask Sankalp"](#8-the-agent--ask-sankalp)
+8. [The agent — "Ask Saakshi"](#8-the-agent--ask-saakshi)
 9. [The workflow — session prep with human sign-off](#9-the-workflow--session-prep-with-human-sign-off)
 10. [Guardrails and observability](#10-guardrails-and-observability)
 11. [The MCP server — the same tools from Claude Desktop](#11-the-mcp-server--the-same-tools-from-claude-desktop)
@@ -60,12 +60,12 @@ If you only read one section, read [The big picture](#2-the-big-picture). If you
 
 ## 2. The big picture
 
-Sankalp has **four** user-facing AI features, plus two supporting systems. They share one database and one set of tools.
+Saakshi has **four** user-facing AI features, plus two supporting systems. They share one database and one set of tools.
 
 | Feature | Where in the app | Type | What it does |
 |---|---|---|---|
 | **Lesson planner** | "Lesson planner" page | RAG | Writes a structured lesson plan for a topic/grade/subject, grounded in the club's own teaching resources |
-| **Ask Sankalp** | "Ask" page | Agent | Answers free-form questions about live club data by choosing and calling tools |
+| **Ask Saakshi** | "Ask" page | Agent | Answers free-form questions about live club data by choosing and calling tools |
 | **Session prep** | "Prepare" button on a session | Workflow + HITL | Drafts a personalised plan for a volunteer's next session; they approve/edit/reject |
 | **MCP server** | Claude Desktop / Claude Code | Tool bridge | Lets an outside AI client use the same tools |
 | Guardrails + AI activity page | middleware + admin page | Support | Limits spend, records everything, shows coordinators what the AI did |
@@ -77,7 +77,7 @@ Here is how they relate:
 flowchart TB
     subgraph Features
         LP["Lesson planner<br/>(RAG)"]
-        ASK["Ask Sankalp<br/>(agent)"]
+        ASK["Ask Saakshi<br/>(agent)"]
         PREP["Session prep<br/>(workflow + human sign-off)"]
         MCP["MCP server<br/>(Claude Desktop etc.)"]
     end
@@ -169,7 +169,7 @@ ai-service/app/                            (Python — FastAPI)
 
 client/src/
 ├── pages/AITeachingNotes.jsx              Lesson planner page
-├── pages/AskSankalp.jsx                   Ask page (streams the answer)
+├── pages/AskSaakshi.jsx                   Ask page (streams the answer)
 ├── pages/SessionPrep.jsx                  Review / approve / reject a draft
 ├── pages/AIActivity.jsx                   Admin observability
 └── utils/api.js                           aiAPI.askStream — reads Server-Sent Events
@@ -199,7 +199,7 @@ sequenceDiagram
     B->>N: POST /api/ai/ask (Authorization: Bearer jwt)
     N->>N: protect() → req.user = { id, role, name }
     N->>N: aiRateLimit → aiDailyBudget
-    N->>P: POST /agent/ask<br/>Authorization: Bearer AI_SERVICE_TOKEN<br/>X-Sankalp-User-Id / -Role / -Name<br/>X-Request-Id
+    N->>P: POST /agent/ask<br/>Authorization: Bearer AI_SERVICE_TOKEN<br/>X-Saakshi-User-Id / -Role / -Name<br/>X-Request-Id
     P->>P: require_internal_auth → InternalUser
     P->>D: read data via tools
     P->>L: chat completions
@@ -211,7 +211,7 @@ sequenceDiagram
 The pieces:
 
 - **`server/services/aiServiceClient.js`** builds the headers, adds a timeout, and translates Python's errors into the status codes the frontend already understands (429 with `Retry-After`, 503, 504). `streamAiService` does the same for streaming responses but returns the raw response body so Node can pipe it byte-for-byte to the browser.
-- **`ai-service/app/internal_auth.py`** checks the shared secret with a constant-time comparison and turns the three `X-Sankalp-User-*` headers into an `InternalUser(id, role, name)`. If the secret is wrong or the headers are missing → 401/400. This is the *only* identity Python ever uses.
+- **`ai-service/app/internal_auth.py`** checks the shared secret with a constant-time comparison and turns the three `X-Saakshi-User-*` headers into an `InternalUser(id, role, name)`. If the secret is wrong or the headers are missing → 401/400. This is the *only* identity Python ever uses.
 - **`X-Request-Id`** is minted by Node per request and echoed by Python, so one failure can be traced across both logs.
 
 > **Beginner takeaway:** Python trusts Node, Node trusts the JWT, the model trusts nobody (see "data, not instructions" in section 8).
@@ -260,7 +260,7 @@ When a provider call finally fails, Python raises a `ProviderError` with a `code
 
 ### The problem RAG solves
 
-Ask a plain LLM "write a Class 4 lesson on fractions" and you get a generic plan that assumes worksheets, printouts and a projector. Sankalp teaches in a one-room village school with chalk, a board and whatever is lying around. The club has written its own teaching resources for exactly that setting. RAG makes the model write **from those resources**.
+Ask a plain LLM "write a Class 4 lesson on fractions" and you get a generic plan that assumes worksheets, printouts and a projector. Sankalp Club teaches in a one-room village school with chalk, a board and whatever is lying around. The club has written its own teaching resources for exactly that setting. RAG makes the model write **from those resources**.
 
 Three stages: **ingest** (once, when a resource is added), **retrieve** (per request), **generate** (per request).
 
@@ -389,7 +389,7 @@ All live in `ai-service/app/tools/`. Every one returns **names, not IDs**, **per
 ```mermaid
 flowchart LR
     T["The 7 tools"]
-    A["Ask Sankalp agent<br/>(Python, LangGraph)<br/>the model picks which to call"]
+    A["Ask Saakshi agent<br/>(Python, LangGraph)<br/>the model picks which to call"]
     W["Session prep workflow<br/>(Node)<br/>code calls 2 of them directly"]
     M["MCP server<br/>(Node)<br/>an outside AI client picks"]
     A --> T
@@ -399,7 +399,7 @@ flowchart LR
 
 ---
 
-## 8. The agent — "Ask Sankalp"
+## 8. The agent — "Ask Saakshi"
 
 ### What "agent" means here
 
@@ -641,7 +641,7 @@ It is an *adapter* over `agentTools.js`, not a second implementation:
 
 1. Reads `MCP_USER_EMAIL` and looks that user up in PostgreSQL. **No email → refuses to start.** MCP has no login, so the server runs *as* one configured person and exposes only that role's tools. A volunteer's config never sees `get_volunteer_stats`.
 2. For each tool from `toolsForRole(user.role)`, converts its JSON-Schema parameters to the zod shape the MCP SDK wants (strings, integers, numbers, booleans, enums — anything else throws at startup rather than silently accepting bad input) and registers it with `readOnlyHint: true`.
-3. Registers one **resource**, `sankalp://whoami` (who the server is acting as and which tools they have), and one **prompt**, `prepare_for_next_session` (a template that asks the client's model to use the tools to work out what to revise).
+3. Registers one **resource**, `saakshi://whoami` (who the server is acting as and which tools they have), and one **prompt**, `prepare_for_next_session` (a template that asks the client's model to use the tools to work out what to revise).
 4. Redirects `console.log` and `console.info` to stderr *before anything else loads*, because stdout is the protocol channel. Any stray `console.log` in a tool would corrupt the stream.
 
 MCP calls are logged to stderr only. They are not written to `agent_runs` and do not count against the in-app budget, because no model call happens on our side — the client's model does the thinking.
@@ -650,10 +650,10 @@ MCP calls are logged to stderr only. They are not written to `agent_runs` and do
 
 ```bash
 # Claude Code
-claude mcp add sankalp -e MCP_USER_EMAIL=you@example.com -- node /absolute/path/to/server/mcp/server.js
+claude mcp add saakshi -e MCP_USER_EMAIL=you@example.com -- node /absolute/path/to/server/mcp/server.js
 ```
 
-Then, in Claude: *"Using Sankalp, which Class 4 students haven't been taught in three weeks?"* — Claude calls `find_students_needing_attention(grade="Class 4", not_taught_for_days=21)` and reads the same shaped result the in-app agent would.
+Then, in Claude: *"Using Saakshi, which Class 4 students haven't been taught in three weeks?"* — Claude calls `find_students_needing_attention(grade="Class 4", not_taught_for_days=21)` and reads the same shaped result the in-app agent would.
 
 ---
 
@@ -697,7 +697,7 @@ A plan passes only if both agree. The judge caught "one printed copy of the shor
 
 ## 13. RAG vs agent vs workflow — when to use which
 
-| | RAG (lesson planner) | Agent (Ask Sankalp) | Workflow (session prep) |
+| | RAG (lesson planner) | Agent (Ask Saakshi) | Workflow (session prep) |
 |---|---|---|---|
 | Who decides the steps | code | **the model** | code |
 | Model calls per request | 1 | 1–6 | exactly 2 |

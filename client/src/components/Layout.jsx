@@ -45,7 +45,7 @@ export default function Layout({ children }) {
             <path d="M3 6h18M3 12h18M3 18h18" />
           </svg>
         </button>
-        <span className="type-title text-[15px] text-ink">Sankalp Club</span>
+        <span className="type-title text-[15px] text-ink">Saakshi</span>
         {live.length > 0 && (
           <span className="ml-auto flex items-center gap-1.5 rounded border border-gold-line bg-gold-wash px-2 py-0.5 text-xs font-medium text-gold-deep">
             <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-gold animate-rule-pulse" />

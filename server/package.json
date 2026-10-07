@@ -1,7 +1,7 @@
 {
-  "name": "sankalps-village-project-server",
+  "name": "saakshi-server",
   "version": "1.0.0",
-  "description": "Backend for Sankalp's Village Project - Volunteer-Driven Learning Management System",
+  "description": "Backend for Saakshi - verified field records for volunteer programs",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

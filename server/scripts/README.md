@@ -1,6 +1,6 @@
 # User Management Scripts
 
-This folder contains scripts to manage users and their roles in the Sankalp Village Project.
+This folder contains scripts to manage users and their roles in Saakshi.
 
 ## Available Scripts
 

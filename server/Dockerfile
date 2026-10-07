@@ -1,7 +1,7 @@
-# Sankalp API — Node/Express.
+# Saakshi API — Node/Express.
 #
-#   docker build -t sankalp-api ./server
-#   docker run --env-file server/.env -p 5000:5000 sankalp-api
+#   docker build -t saakshi-api ./server
+#   docker run --env-file server/.env -p 5000:5000 saakshi-api
 #
 # Runs as the unprivileged `node` user; migrations are applied by the same
 # image (`node scripts/migratePg.js`) so the compose stack needs no second one.
