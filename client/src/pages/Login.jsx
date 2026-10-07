@@ -1,22 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import PhotoFan from '../components/PhotoFan';
 import { LOGIN_PRINTS } from '../data/villagePhotos';
 import { GoogleOAuthProvider, GoogleLogin, useGoogleOAuth } from '@react-oauth/google';
-import DotGrid from '../components/DotGrid';
+import WitnessGrid from '../components/WitnessGrid';
 import logoImage from '../assets/saakshi-mark.svg';
 
-// A faint ruled surface for the board panels — the same structural idea as
-// the app's spine and table hairlines, turned into ambient texture instead
-// of a functional device. Ledger lines, not chalkboard grunge: systematic,
-// quiet, in keeping with a register rather than a classroom mural.
-const BOARD_TEXTURE = {
-  backgroundImage: [
-    'repeating-linear-gradient(to bottom, transparent, transparent 39px, rgba(255,255,255,0.035) 39px, rgba(255,255,255,0.035) 40px)',
-    'radial-gradient(ellipse 900px 500px at 12% -8%, rgba(255,255,255,0.05), transparent 60%)',
-  ].join(', '),
-};
+// What makes an entry trustworthy, in the order a volunteer meets them.
+const CHECKS = [
+  'A code read out in the room',
+  'A location check on site',
+  'A line for every child taught',
+];
+
+// The mark's own tick, so "checked" means the same thing here as in the logo.
+function Tick() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E9A83A" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
+      <path d="M5 12.5l4.5 4.5L19 7" />
+    </svg>
+  );
+}
 
 function EyeIcon({ crossed }) {
   return (
@@ -158,6 +162,8 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [googleScriptFailed, setGoogleScriptFailed] = useState(false);
   const [demoRole, setDemoRole] = useState(null);
+  // A different afternoon from the village on each visit.
+  const [photo] = useState(() => LOGIN_PRINTS[Math.floor(Math.random() * LOGIN_PRINTS.length)]);
   const { login, demoLogin } = useAuth();
   const navigate = useNavigate();
 
@@ -225,147 +231,65 @@ export default function Login() {
 
   return (
     <GoogleOAuthProvider clientId={googleClientId} onScriptLoadError={() => setGoogleScriptFailed(true)}>
-      <div className="flex min-h-screen flex-col bg-paper lg:grid lg:grid-cols-[1.05fr_1fr]">
-        {/* Compact brand band — mobile only. The full register-mark motif needs
-            room to read, so it stays a desktop flourish; mobile keeps just the
-            essentials: wordmark, the statement, and the one "this is real and
-            active" signal. */}
-        <div className="relative overflow-hidden bg-board px-5 py-7 sm:px-8 lg:hidden" style={BOARD_TEXTURE}>
-          <div className="relative flex animate-rise-in items-center gap-2.5">
-            <img src={logoImage} alt="" className="h-8 w-8 rounded" />
-            <span className="type-title text-[15px] text-paper">Saakshi</span>
-            <span className="text-[13px] text-board-400">· Sankalp Club</span>
-          </div>
-
-          <p
-            className="type-display relative mt-5 max-w-[13ch] text-[28px] leading-[1.12] text-paper animate-rise-in"
-            style={{ animationDelay: '70ms' }}
-          >
-            Every lesson, on the record.
-          </p>
-
-          <p
-            className="relative mt-2.5 max-w-[34ch] text-[13px] leading-relaxed text-board-400 animate-rise-in"
-            style={{ animationDelay: '140ms' }}
-          >
-            Volunteers teach in the village. This is where it gets written down.
-          </p>
-
-          <div
-            className="relative mt-4 flex items-center gap-2 text-[12px] text-board-400 animate-rise-in"
-            style={{ animationDelay: '210ms' }}
-          >
-            <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold-bright animate-rule-pulse" />
-            Recorded on site, inside the session window.
-          </div>
-
-          <Link
-            to="/village"
-            aria-label="See the village project"
-            className="group relative mt-6 flex w-fit items-end gap-4 animate-rise-in"
-            style={{ animationDelay: '260ms' }}
-          >
-            <PhotoFan photos={LOGIN_PRINTS} className="h-[112px]" />
-            <span className="pb-1 text-[12px] text-board-400 transition-colors group-hover:text-paper">
-              See the village <span aria-hidden="true">&rarr;</span>
-            </span>
-          </Link>
-        </div>
-
-        {/* The blackboard side states what the register is for. */}
-        <aside
-          className="relative hidden overflow-hidden bg-board p-12 text-paper lg:flex lg:flex-col lg:justify-between xl:p-16"
-          style={BOARD_TEXTURE}
+      <div className="flex min-h-screen flex-col bg-paper lg:grid lg:grid-cols-[1.3fr_1fr]">
+        {/* The witness wall: an afternoon from the village, written into the
+            board one record at a time. Everything over it is copy. */}
+        <WitnessGrid
+          image={photo.small}
+          label={photo.alt}
+          className="h-[62svh] min-h-[440px] lg:h-auto lg:min-h-screen"
         >
-          {/* Sits under the ruled-line texture and the copy (both `relative`,
-              so they paint above this un-z-indexed absolute layer by DOM
-              order). Board tones only — gold stays reserved for the live dot. */}
-          <div className="absolute inset-0">
-            <DotGrid
-              dotSize={3}
-              gap={26}
-              baseColor="#2A3A35"
-              activeColor="#5C716A"
-              proximity={110}
-              shockRadius={180}
-              shockStrength={1.5}
-              resistance={800}
-              returnDuration={1.1}
-            />
-          </div>
+          {/* The board rises behind the words so they stay readable over any
+              photo; the top keeps a little shade for the wordmark. */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(23,33,31,0.96)_0%,rgba(23,33,31,0.86)_26%,rgba(23,33,31,0.12)_56%,rgba(23,33,31,0)_100%)]"
+          />
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[linear-gradient(to_bottom,rgba(23,33,31,0.88),rgba(23,33,31,0))]"
+          />
 
-          <div className="relative flex animate-rise-in items-center gap-3">
-            <img src={logoImage} alt="" className="h-9 w-9 rounded" />
-            <span className="type-title text-[16px] text-paper">Saakshi</span>
-            <span className="text-[14px] text-board-400">· Sankalp Club</span>
-          </div>
-
-          <div className="relative">
-          {/* Prints from the village, pinned to the board: the register is
-              for these afternoons, so the first screen should show one. */}
-          <Link
-            to="/village"
-            aria-label="See the village project"
-            className="group mb-10 block w-fit animate-rise-in rounded-md xl:mb-12"
-            style={{ animationDelay: '60ms' }}
-          >
-            <PhotoFan photos={LOGIN_PRINTS} className="h-[clamp(170px,27vh,290px)]" />
-            <span className="mt-8 inline-flex items-center gap-1.5 text-[13px] text-board-400 transition-colors group-hover:text-paper">
-              From our weekend sessions
-              <span aria-hidden="true" className="transition-transform group-hover:translate-x-0.5">&rarr;</span>
-            </span>
-          </Link>
-
-          {/* The register mark: a tick and a ruled line, the same grammar the
-              rest of the app uses to say "this entry, on this date" — placed
-              here as if the page itself is the first line in the book. */}
-          <div className="relative flex gap-5">
-            <div className="flex w-2.5 shrink-0 flex-col items-center self-stretch">
-              <span
-                aria-hidden="true"
-                className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-gold-bright shadow-[0_0_0_4px_rgba(233,168,58,0.18)] animate-mark-in"
-                style={{ animationDelay: '90ms' }}
-              />
-              <span
-                aria-hidden="true"
-                className="mt-1 w-[1.5px] flex-1 origin-top bg-board-400/80 animate-grow-down"
-                style={{ animationDelay: '220ms' }}
-              />
+          <div className="pointer-events-none relative flex h-full flex-col justify-between p-5 sm:p-8 lg:p-12 xl:p-16">
+            <div className="flex items-center gap-2.5">
+              <img src={logoImage} alt="" className="h-9 w-9 rounded" />
+              <span className="type-title text-[17px] text-paper">Saakshi</span>
+              <span className="text-[13px] text-paper/70">for Sankalp Club</span>
             </div>
 
             <div>
-              <p
-                className="type-display max-w-[13ch] text-[clamp(2.4rem,3.9vw,3.6rem)] text-paper animate-rise-in"
-                style={{ animationDelay: '160ms' }}
+              <h1
+                className="max-w-[11ch] text-[clamp(2.4rem,5.6vw,5.5rem)] leading-[0.96] tracking-[-0.03em] text-paper"
+                style={{ fontStretch: '125%', fontWeight: 800 }}
               >
-                Every lesson, on the record.
+                Good work deserves a witness.
+              </h1>
+              <p className="mt-5 hidden max-w-[46ch] text-[15px] leading-relaxed text-paper/75 sm:block lg:mt-6 lg:text-[16px]">
+                Volunteers teach, feed and care for people every weekend, and most of that work is
+                never written down. Saakshi records it where it happens, so the volunteers, the people
+                they serve and the people who fund them can all trust that it happened.
               </p>
-              <p
-                className="mt-6 max-w-[42ch] text-[15px] leading-relaxed text-board-400 animate-rise-in"
-                style={{ animationDelay: '240ms' }}
+              <ul className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-x-6 lg:mt-7">
+                {CHECKS.map((check) => (
+                  <li key={check} className="flex items-center gap-2 text-[13px] text-paper/90 sm:text-[14px]">
+                    <Tick />
+                    {check}
+                  </li>
+                ))}
+              </ul>
+              <Link
+                to="/village"
+                className="pointer-events-auto mt-6 inline-block text-[13px] text-paper/60 underline-offset-4 transition-colors hover:text-paper hover:underline lg:mt-8"
               >
-                Volunteers teach in the village. This is where the session opens, the
-                code goes out, and what each child was taught gets written down.
-              </p>
+                See the village we teach in
+              </Link>
             </div>
           </div>
-          </div>
+        </WitnessGrid>
 
-          <div
-            className="relative flex items-center gap-3 text-[13px] text-board-400 animate-rise-in"
-            style={{ animationDelay: '320ms' }}
-          >
-            <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold-bright animate-rule-pulse" />
-            Attendance is recorded on site, inside the session window.
-          </div>
-        </aside>
-
-        <main className="flex flex-1 items-center justify-center px-5 py-10 sm:px-8 sm:py-12 lg:min-h-screen lg:py-12">
-          <div className="w-full max-w-[26rem] animate-rise-in" style={{ animationDelay: '120ms' }}>
-            {/* Smaller below lg: the compact band above already carries the
-                headline, so "Sign in" only needs to read as a section
-                label, not a second competing statement. */}
-            <h1 className="type-display text-[24px] text-ink lg:text-[30px]">Sign in</h1>
+        <main className="flex flex-1 flex-col items-center justify-center px-5 py-10 sm:px-8 sm:py-12 lg:min-h-screen lg:py-12">
+          <div className="w-full max-w-[26rem]">
+            <h2 className="type-display text-[26px] text-ink lg:text-[30px]">Sign in</h2>
             <p className="mt-2 text-sm text-ink-2">
               Use the account your coordinator set up for you.
             </p>
@@ -507,6 +431,10 @@ export default function Login() {
                 />
               </>
             )}
+
+            <p className="mt-10 text-[12px] text-ink-3">
+              Saakshi (<span lang="hi">साक्षी</span>) is Hindi for witness.
+            </p>
           </div>
         </main>
       </div>
