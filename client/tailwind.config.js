@@ -131,6 +131,16 @@ export default {
           from: { transform: 'translateX(0)' },
           to: { transform: 'translateX(-50%)' },
         },
+        // The login photo wall: each column holds its photos twice, so moving
+        // it by half its height loops seamlessly, in either direction.
+        'wall-up': {
+          from: { transform: 'translateY(0)' },
+          to: { transform: 'translateY(-50%)' },
+        },
+        'wall-down': {
+          from: { transform: 'translateY(-50%)' },
+          to: { transform: 'translateY(0)' },
+        },
       },
       animation: {
         'rule-pulse': 'rule-pulse 1.6s ease-in-out infinite',
@@ -143,6 +153,9 @@ export default {
         'work-dot': 'work-dot 1.05s ease-in-out infinite',
         'rule-sweep': 'rule-sweep 1.4s cubic-bezier(0.65, 0, 0.35, 1) infinite',
         marquee: 'marquee 70s linear infinite',
+        // Per-column speed is set inline with animation-duration.
+        'wall-up': 'wall-up 80s linear infinite',
+        'wall-down': 'wall-down 80s linear infinite',
       },
     },
   },
