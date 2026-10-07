@@ -78,6 +78,3 @@ export const GALLERY = [
   PHOTOS.sunsetGroup,
   PHOTOS.volunteerNotebook,
 ];
-
-// The prints pinned to the login board.
-export const LOGIN_PRINTS = [PHOTOS.goldenHour, PHOTOS.girlDiary, PHOTOS.countingTogether, PHOTOS.girlsTreeGuards];
